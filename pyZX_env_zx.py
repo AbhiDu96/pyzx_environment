@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import numpy as np
 import pyzx as zx
 import qiskit
@@ -12,10 +12,10 @@ from qiskit.quantum_info import Statevector, state_fidelity, DensityMatrix, aver
 import torch_geometric.transforms as T
 import copy
 from fractions import Fraction
-import rules.custom_rules_chrisitan as rules
+from .rules import custom_rules_chrisitan as rules
 #import custom_rules_pyzx as rules
-from circuit_utils.circuit_generator import random_circuit
-from circuit_utils.reward_calculator import tcount_from_graph, check_equality
+from .circuit_utils.circuit_generator import random_circuit
+from .circuit_utils.reward_calculator import tcount_from_graph, check_equality
 
 # For profilining
 import builtins
@@ -53,8 +53,8 @@ RenderFrame = TypeVar("RenderFrame")
 
 
 
-from circuit_utils.grpah_format_converter_indexAdjusted import pyzx_to_heterogeneous_torchData, pyzy_to_homogeneous_torchData
-from circuit_utils.circuit_extractor import Circuit_extractor
+from .circuit_utils.grpah_format_converter_indexAdjusted import pyzx_to_heterogeneous_torchData, pyzy_to_homogeneous_torchData
+from .circuit_utils.circuit_extractor import Circuit_extractor
 
 
 
@@ -218,7 +218,8 @@ class pyZX_env(gym.Env):
         #assert self.action_space.contains(action), err_msg
         assert self.state is not None, "Call reset before using step method."
 
-        done = False
+        truncated = False
+        terminated = False
 
         """if action == self.action_space.n:
             done = True"""
@@ -235,7 +236,7 @@ class pyZX_env(gym.Env):
         if action != self.action_space.n:
             
             if self.action_masks[action][0] != 1:
-                if not done :
+                if not terminated :
                     match_name, match_tupples, match_num = self.select_match_tupples(action)
                     
                     rewrite = getattr(rules, match_name)
@@ -290,9 +291,10 @@ class pyZX_env(gym.Env):
         self.step_counter += 1
             
         if self.step_counter >= self._max_episode_steps:
-            done = True
+            truncated = True
+        terminated =False
         
-        if done:
+        if terminated or truncated:
 
             #extrator = Circuit_extractor(self.state_zx_graph)
             #success = extrator.extract_circuit()
@@ -330,5 +332,5 @@ class pyZX_env(gym.Env):
             if reward == 0:
                 reward = -2    
 
-        return [self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], reward, done, info
+        return [self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], reward, terminated, truncated, info
         
