@@ -212,8 +212,8 @@ class pyZX_env(gym.Env):
         return match_name, match_tupples, match_num
 
     @profile
-    def step(self, action: ActType, position: int) -> Tuple[ObsType, float, bool, bool, dict]:
-
+    def step(self, action: ActType, position: int | None = None, location: int | None = None) -> Tuple[ObsType, float, bool, bool, dict]:
+        #print("entry step", len(list(self.state_zx_graph.ty.keys())))
         #err_msg = f"{action!r} ({type(action)}) invalid"
         #assert self.action_space.contains(action), err_msg
         assert self.state is not None, "Call reset before using step method."
@@ -242,14 +242,18 @@ class pyZX_env(gym.Env):
                     rewrite = getattr(rules, match_name)
                     info["applied_rule"] = match_name
                     info["match_tupples"] = match_tupples
-                    
-                    if type(match_tupples[0]) == tuple:
+                    if location is None:
+                        if type(match_tupples[0]) == tuple:
                             relative_position = position - self.state.num_nodes
                             location = self.state.edge_index[:, relative_position]
                             location = (location[0].item(), location[1].item())
-                            location = (list(self.state_zx_graph.ty.keys())[location[0]], list(self.state_zx_graph.ty.keys())[location[1]])
-                    else:
+                            lookup = list(self.state_zx_graph.ty.keys())
+                            #print("location indices raw",location,"graph state",self.state,"zx graph size",len(lookup))
+                            location = (lookup[location[0]], lookup[location[1]])
+                        else:
                             location = position
+                            #l = len(list(self.state_zx_graph.ty.keys()))-1
+                            #print("position length", l, "location",location,self.state)
                             location = list(self.state_zx_graph.ty.keys())[location]
                     
                     #input_output = self.state_zx_graph.inputs() + self.state_zx_graph.outputs()
@@ -283,6 +287,7 @@ class pyZX_env(gym.Env):
                         self.state = T.ToUndirected()(self.state)
                         self.compute_action_masks()
             else:
+                print("ACTION NOT MASKED!!!")
                 reward = -199
             
         else:
@@ -331,6 +336,11 @@ class pyZX_env(gym.Env):
 
             if reward == 0:
                 reward = -2    
+        # print("exit step", len(list(self.state_zx_graph.ty.keys())))
+        self.state = self.converter(self.state_zx_graph)
+        self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
+        self.state = T.ToUndirected()(self.state)
+        self.compute_action_masks()
 
         return [self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], reward, terminated, truncated, info
         

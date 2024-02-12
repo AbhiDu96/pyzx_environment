@@ -45,9 +45,12 @@ def pyzy_to_homogeneous_torchData(pyzx_graph, label=None, graph_type=None):
     #pyzx_graph = zx.Graph().from_json(g)
     coo_mat, edge_features = graph_type(pyzx_graph)
     
-    node_phase = np.array([float(x) for x in list(pyzx_graph.phases().values())])*np.pi
+    keys = list(pyzx_graph.ty.keys())
+    #print("nkeys",len(keys))
+    dct=pyzx_graph.phases()
+    node_phase = np.array([float(dct[x]) for x in keys])*np.pi
     node_type = np.array(list(pyzx_graph.types().values()))
-    keys = list(pyzx_graph.types())
+    #keys = list(pyzx_graph.types())
     #node_features = np.zeros((len(node_phase), 2))
     node_features = np.hstack((node_type.reshape(-1,1), node_phase.reshape(-1,1)))
 
