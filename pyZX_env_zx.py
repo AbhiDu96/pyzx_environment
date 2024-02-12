@@ -96,6 +96,8 @@ class pyZX_env(gym.Env):
         self.action_space = gym.spaces.Discrete(len(self.rules_list))
         self._max_episode_steps = max_steps
         self.step_counter = 0
+        # this is just a dummy to make gymnasium happy
+        self.observation_space = gym.spaces.Discrete(5)
     
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple[ObsType, dict]:
         
