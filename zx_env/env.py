@@ -1,21 +1,17 @@
 import gymnasium as gym
 import numpy as np
 import pyzx as zx
-import qiskit
-#from pyzx import rules
 import torch
 import re
-from qiskit import QuantumCircuit, execute
-from qiskit import qasm2
-from qiskit import Aer
-from qiskit.quantum_info import Statevector, state_fidelity, DensityMatrix, average_gate_fidelity
 import torch_geometric.transforms as T
 import copy
 from fractions import Fraction
-from .rules import custom_rules_chrisitan as rules
-#import custom_rules_pyzx as rules
-from .circuit_utils.circuit_generator import random_circuit
-from .circuit_utils.reward_calculator import tcount_from_graph, check_equality
+from zx_env.rules import custom_rules as rules
+from zx_env.circuit_utils.circuit_generator import random_circuit
+import zx_env.general_utils.reward_functions as rf
+from zx_env.general_utils.utils import check_equality, tcount_from_graph
+from zx_env.circuit_utils.circuit_extractor import extract_circuit
+from zx_env.circuit_utils.grpah_format_converter_indexAdjusted import pyzx_to_heterogeneous_torchData, pyzy_to_homogeneous_torchData
 
 # For profilining
 import builtins
@@ -53,20 +49,16 @@ RenderFrame = TypeVar("RenderFrame")
 
 
 
-from .circuit_utils.grpah_format_converter_indexAdjusted import pyzx_to_heterogeneous_torchData, pyzy_to_homogeneous_torchData
-from .circuit_utils.circuit_extractor import Circuit_extractor
-
-
-
-
-class pyZX_env(gym.Env):
+class zx_env(gym.Env):
     """_summary_
 
     Args:
         gym (_type_): _description_
     """
     def __init__(self, n_qubits = 5, depth = 250, rules_list = None, max_steps=100, h_ratio = 0.3, t_ratio = 0.5, mq_ratio = 0.1,
-        graph_type = "homogeneous", random_location=True, add_no_action=False) -> None:
+        graph_type = "homogeneous", random_location=True, add_no_action=False,
+        mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_cnot_count=10,
+        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom") -> None:
         super().__init__()
 
         self.h_ratio = h_ratio
@@ -76,6 +68,28 @@ class pyZX_env(gym.Env):
         self.n_depth = depth
         self.graph_type = graph_type
         self.add_no_action = add_no_action
+        self.mutate_graph = mutate_graph
+        self.mutate_probability = mutate_probability
+        self.mutation_steps = mutation_steps
+        self.min_cnot_count = min_cnot_count
+        self.circuit_extraction_type = circuit_extraction_type
+
+        if reward_fn == "normalized_t_count_reward":
+            self.reward_fn = rf.normalized_t_count_reward
+        elif reward_fn == "absolute_t_count_reward":
+            self.reward_fn = rf.absolute_t_count_reward
+        elif reward_fn == "absolute_cnot_count_reward":
+            self.reward_fn = rf.absolute_cnot_count_reward
+        elif reward_fn == "normalized_cnot_count_reward":
+            self.reward_fn = rf.normalized_cnot_count_reward
+        elif reward_fn == "pyzx_normalized_t_count_reward":
+            self.reward_fn = rf.pyzx_normalized_t_count_reward
+        elif reward_fn == "pyzx_normalized_cnot_count_reward":
+            self.reward_fn = rf.pyzx_normalized_cnot_count_reward
+        else:
+            self.reward_fn = reward_fn
+
+
         if graph_type == "homogeneous":
             self.converter = pyzy_to_homogeneous_torchData
         else:
@@ -89,7 +103,6 @@ class pyZX_env(gym.Env):
             self.rules_list = [r for r in self.rule_func_list if "match_" in r]
 
         self.state_zx_graph_initital = None
-        self.state_qiskit_circuit_initial = None
         self.state_zx_graph = None
         self.state = None
 
@@ -98,50 +111,53 @@ class pyZX_env(gym.Env):
         self.step_counter = 0
         # this is just a dummy to make gymnasium happy
         self.observation_space = gym.spaces.Discrete(5)
+
     
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None) -> Tuple[ObsType, dict]:
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None) -> Tuple[ObsType, dict]:
         
         self.step_counter = 0
         circuit_generated = False
-        while not circuit_generated:
-            init_success = False
-            while not init_success:
-                #circuit = zx.generate.CNOT_HAD_PHASE_circuit(qubits=self.n_qubits,depth=self.n_depth,clifford=False, p_had=self.h_ratio, p_t=self.t_ratio)
+
+        if initital_circuit_graph == None:
+            while not circuit_generated:
                 circuit = random_circuit(n_qubit=self.n_qubits, num_gates=self.n_depth, p_two_qubit=self.mq_ratio, p_H=self.h_ratio, 
-                        p_z=self.t_ratio, p_x=1-(self.mq_ratio+self.h_ratio+self.t_ratio), clifford_plus_T=True)
-                
-                # extract circut
-                #initital_circuit_graph = zx.Circuit.from_qasm(self.state_qiskit_circuit_initial.qasm()).to_graph()
+                            p_z=self.t_ratio, p_x=1-(self.mq_ratio+self.h_ratio+self.t_ratio), clifford_plus_T=True)
                 initital_circuit_graph = circuit.to_graph()
-                initital_circuit_graph_clone = initital_circuit_graph.clone()
-                init_circuit_extractor = Circuit_extractor(initital_circuit_graph_clone)
-                init_success = init_circuit_extractor.extract_circuit()
-            
-            self.reduced_zx_graph = initital_circuit_graph.clone()
-            zx.full_reduce(self.reduced_zx_graph)
-            
-            self.baseline_reward = tcount_from_graph(self.reduced_zx_graph)
-            full_t_count = tcount_from_graph(initital_circuit_graph)
-            if full_t_count >= 10:
-                circuit_generated = True
-
-
-
-
-        self.state_qiskit_circuit_initial = qiskit.QuantumCircuit.from_qasm_str(init_circuit_extractor.zx_circuit.to_qasm())
-        self.state_qiskit_circuit_initial = qiskit.transpile(self.state_qiskit_circuit_initial, optimization_level=3, basis_gates=['h', 'cx', 'rz'])
-        initial_circuit = zx.Circuit.from_graph(initital_circuit_graph, split_phases=True)
-        
-        self.qiskit_reduced_zx = qiskit.QuantumCircuit.from_qasm_str(zx.extract_circuit(self.reduced_zx_graph.clone()).to_qasm())
-        self.initial_gate_count = initial_circuit.stats_dict()['twoqubit']   #np.sum(list(self.state_qiskit_circuit_initial.count_ops().values()))
-        self.full_reduced_gate_count = zx.extract_circuit(self.reduced_zx_graph.clone()).stats_dict()['twoqubit'] #np.sum(list(self.qiskit_reduced_zx.count_ops().values()))
-            
+                # single extract pass through to reduce simple cancelations 
+                (initial_circuit, _) = extract_circuit(initital_circuit_graph)
+                initital_circuit_graph = initial_circuit.to_graph()
+                if tcount_from_graph(initital_circuit_graph) >= 10:
+                    circuit_generated = True
+        self.state_circuit_initial = initial_circuit
         self.state_zx_graph_initital = initital_circuit_graph.clone()
         self.state_zx_graph = initital_circuit_graph.clone()
-        
-        
-        #check_eq = check_equality(self.reduced_zx_graph, self.state_zx_graph_initital)
 
+        # extract pyzx based graph and circuit
+        self.reduced_zx_graph = initital_circuit_graph.clone()
+        zx.full_reduce(self.reduced_zx_graph.clone())
+        self.reduced_zx_circuit = zx.extract_circuit(self.reduced_zx_graph)
+
+        self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
+        self.baseline_cnot_count = initial_circuit.stats_dict()['twoqubit']
+        self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
+        self.pyzx_cnot_count = self.reduced_zx_circuit.stats_dict()['twoqubit']
+
+        # morph the graph
+        if np.random.rand() < self.mutate_probability:
+            mutation_counter = 0
+            while mutation_counter < self.mutation_steps:
+                action = np.random.randint(len(self.rules_list))
+                match_name, match_tupples, match_num = self.select_match_tupples(action)
+                rewrite = getattr(rules, match_name)
+                if len(match_tupples)>0:
+                    if match_name == "unspider":
+                        neighbor=[list(self.state_zx_graph.neighbors(match_tupples[match_num]))[0]]
+                        new_phase=Fraction(1,1)
+                        rules.unspider(self.state_zx_graph, [match_tupples[match_num],neighbor, new_phase])
+                    else:
+                        rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=match_tupples[match_num])
+                    mutation_counter += 1
+        
         self.state = self.converter(self.state_zx_graph)
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
         self.state = T.ToUndirected()(self.state)
@@ -213,7 +229,7 @@ class pyZX_env(gym.Env):
         
         return match_name, match_tupples, match_num
 
-    @profile
+    #@profile
     def step(self, action: ActType, position: int | None = None, location: int | None = None) -> Tuple[ObsType, float, bool, bool, dict]:
         #print("entry step", len(list(self.state_zx_graph.ty.keys())))
         #err_msg = f"{action!r} ({type(action)}) invalid"
@@ -232,15 +248,15 @@ class pyZX_env(gym.Env):
         info["init_circuit"] = None
         info["final_circuit"] = None
         info["depth_reduction"] = None
-        info["gate_count_reduction"] = None
+        info["cnot_count_reduction"] = None
         reward = 0
 
         if action != self.action_space.n:
-            
             if self.action_masks[action][0] != 1:
+
                 if not terminated :
                     match_name, match_tupples, match_num = self.select_match_tupples(action)
-                    
+
                     rewrite = getattr(rules, match_name)
                     info["applied_rule"] = match_name
                     info["match_tupples"] = match_tupples
@@ -254,11 +270,7 @@ class pyZX_env(gym.Env):
                             location = (lookup[location[0]], lookup[location[1]])
                         else:
                             location = position
-                            #l = len(list(self.state_zx_graph.ty.keys()))-1
-                            #print("position length", l, "location",location,self.state)
                             location = list(self.state_zx_graph.ty.keys())[location]
-                    
-                    #input_output = self.state_zx_graph.inputs() + self.state_zx_graph.outputs()
 
                     if len(match_tupples) > 0:
                         prev_graph = self.state_zx_graph.clone()
@@ -273,21 +285,14 @@ class pyZX_env(gym.Env):
                                 info["match_num"] = position
                                 rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=location)
 
-                            temp = self.state_zx_graph.clone()
-                            zx.full_reduce(temp)
-                            #current_t_count = tcount_from_graph(self.state_zx_graph.clone())
-                            current_t_count = tcount_from_graph(temp)
-                            current_gate_count = zx.extract_circuit(temp).stats_dict()['twoqubit']
-                            reward = 2*(self.baseline_reward - current_t_count) + (self.initial_gate_count  - current_gate_count)
+                            reward = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
+                                pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
                         
                         except Exception as e:
                             logger.exception(e)
                             reward = -99
                             self.state_zx_graph = prev_graph
-                        self.state = self.converter(self.state_zx_graph)
-                        self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
-                        self.state = T.ToUndirected()(self.state)
-                        self.compute_action_masks()
+
             else:
                 print("ACTION NOT MASKED!!!")
                 reward = -199
@@ -303,42 +308,46 @@ class pyZX_env(gym.Env):
         
         if terminated or truncated:
 
-            #extrator = Circuit_extractor(self.state_zx_graph)
-            #success = extrator.extract_circuit()
-            zx.full_reduce(self.state_zx_graph)
+            
             success = check_equality(self.state_zx_graph_initital, self.state_zx_graph)
             
 
             if success:
-                print('Unitary check passed')
+                reward = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
+                                pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
+
                 current_t_count = tcount_from_graph(self.state_zx_graph)
-                current_gate_count = zx.extract_circuit(self.state_zx_graph.clone()).stats_dict()['twoqubit']
-                reward = 2*(self.baseline_reward - current_t_count) + (self.initial_gate_count  - current_gate_count)
-                q_circ_og = qiskit.QuantumCircuit.from_qasm_str(zx.extract_circuit(self.state_zx_graph.clone()).to_qasm())
 
+                if self.circuit_extraction_type == "custom":
+                    (circuit, _) = extract_circuit(self.state_zx_graph.clone())
+                else:
+                    zx.full_reduce(self.state_zx_graph)
+                    circuit = zx.extract_circuit(self.state_zx_graph.clone())
 
-                info["init_circuit"] = self.state_qiskit_circuit_initial
-                info["init_circuit_gate_count"] = self.initial_gate_count
-                info["init_circuit_t_count"] = tcount_from_graph(self.state_zx_graph_initital)
-
-
-                info["final_circuit"] = q_circ_og
-                info["final_circuit_gate_count"] = current_gate_count
-                info["final_circuit_t_count"] = tcount_from_graph(self.state_zx_graph)
-
-                info["gate_count_reduction"]  = self.initial_gate_count  - current_gate_count
-                info["full_reduce_circuit"]  = self.qiskit_reduced_zx
-                info["full_reduce_gate_count"]  = self.full_reduced_gate_count
-                info["full_reduce_circuit_t_count"] = tcount_from_graph(self.reduced_zx_graph)
+                current_cnot_count = circuit.stats_dict()['twoqubit']
                 
-                #print("done triggered: ", reward)
+
+
+                info["init_circuit"] = self.state_circuit_initial
+                info["init_circuit_cnot_count"] = self.baseline_cnot_count
+                info["init_circuit_t_count"] = self.baseline_t_count
+
+
+                info["final_circuit"] = circuit
+                info["final_circuit_cnot_count"] = current_cnot_count
+                info["final_circuit_t_count"] = current_t_count
+
+                info["full_reduce_circuit"]  = self.reduced_zx_circuit
+                info["full_reduce_cnot_count"]  = self.pyzx_cnot_count
+                info["full_reduce_circuit_t_count"] = self.pyzx_t_count
+                
 
             else:
                 reward = -1000
 
             if reward == 0:
                 reward = -2    
-        # print("exit step", len(list(self.state_zx_graph.ty.keys())))
+        
         self.state = self.converter(self.state_zx_graph)
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
         self.state = T.ToUndirected()(self.state)

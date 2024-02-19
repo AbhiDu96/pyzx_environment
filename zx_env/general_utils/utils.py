@@ -1,6 +1,17 @@
+import pyzx as zx
 import fractions
 import copy
-import pyzx as zx
+
+def check_equality(g1,g2):
+    g_combined=g1+g2.adjoint()
+    zx.full_reduce(g_combined)
+    # next line: if a graph corresponds to the identity it has the same number of edges as qubits
+    # and correspondingly as inputs
+    if (len(g_combined.inputs())==len(list(g_combined.edges()))):
+        return True
+    else:
+        return False
+
 
 def tcount_from_graph(g):
     '''Function calculates an approximation to the expected number of T gates for the extracted circuit
@@ -34,13 +45,3 @@ def tcount_from_graph(g):
             assert 0, 'phases must be fractions or integers'
     return tcount
 
-
-def check_equality(g1,g2):
-    g_combined=g1+g2.adjoint()
-    zx.full_reduce(g_combined)
-    # next line: if a graph corresponds to the identity it has the same number of edges as qubits
-    # and correspondingly as inputs
-    if (len(g_combined.inputs())==len(list(g_combined.edges()))):
-        return True
-    else:
-        return False
