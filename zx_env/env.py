@@ -73,13 +73,15 @@ class zx_env(gym.Env):
         self.mutation_steps = mutation_steps
         self.min_cnot_count = min_cnot_count
         self.circuit_extraction_type = circuit_extraction_type
-
+        self.negative_reward = -0.1
         if reward_fn == "normalized_t_count_reward":
             self.reward_fn = rf.normalized_t_count_reward
         elif reward_fn == "absolute_t_count_reward":
             self.reward_fn = rf.absolute_t_count_reward
+            self.negative_reward = -2
         elif reward_fn == "absolute_cnot_count_reward":
             self.reward_fn = rf.absolute_cnot_count_reward
+            self.negative_reward = -2
         elif reward_fn == "normalized_cnot_count_reward":
             self.reward_fn = rf.normalized_cnot_count_reward
         elif reward_fn == "pyzx_normalized_t_count_reward":
@@ -346,7 +348,7 @@ class zx_env(gym.Env):
                 reward = -1000
 
             if reward == 0:
-                reward = -2    
+                reward = self.negative_reward  
         
         self.state = self.converter(self.state_zx_graph)
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
