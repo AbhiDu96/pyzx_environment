@@ -136,12 +136,13 @@ class zx_env(gym.Env):
 
         # extract pyzx based graph and circuit
         self.reduced_zx_graph = initital_circuit_graph.clone()
-        zx.full_reduce(self.reduced_zx_graph.clone())
+        zx.full_reduce(self.reduced_zx_graph)
+
+        self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
         self.reduced_zx_circuit = zx.extract_circuit(self.reduced_zx_graph)
 
         self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
         self.baseline_cnot_count = initial_circuit.stats_dict()['twoqubit']
-        self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
         self.pyzx_cnot_count = self.reduced_zx_circuit.stats_dict()['twoqubit']
 
         # morph the graph
