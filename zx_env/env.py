@@ -57,7 +57,7 @@ class zx_env(gym.Env):
     """
     def __init__(self, n_qubits = 5, depth = 250, rules_list = None, max_steps=100, h_ratio = 0.3, t_ratio = 0.5, mq_ratio = 0.1,
         graph_type = "homogeneous", random_location=True, add_no_action=False,
-        mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_cnot_count=10,
+        mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_t_count_diff=0.1,
         reward_fn="normalized_t_count_reward", circuit_extraction_type="custom") -> None:
         super().__init__()
 
@@ -71,7 +71,7 @@ class zx_env(gym.Env):
         self.mutate_graph = mutate_graph
         self.mutate_probability = mutate_probability
         self.mutation_steps = mutation_steps
-        self.min_cnot_count = min_cnot_count
+        self.min_t_count_diff = min_t_count_diff
         self.circuit_extraction_type = circuit_extraction_type
         self.negative_reward = -0.1
         if reward_fn == "normalized_t_count_reward":
