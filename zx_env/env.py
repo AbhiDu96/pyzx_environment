@@ -123,25 +123,31 @@ class zx_env(gym.Env):
         if initital_circuit_graph == None:
             while not circuit_generated:
                 circuit = random_circuit(n_qubit=self.n_qubits, num_gates=self.n_depth, p_two_qubit=self.mq_ratio, p_H=self.h_ratio, 
-                            p_z=self.t_ratio, p_x=1-(self.mq_ratio+self.h_ratio+self.t_ratio), clifford_plus_T=True)
+                            p_z=self.t_ratio/2, p_x=1-(self.mq_ratio+self.h_ratio+(self.t_ratio/2)), clifford_plus_T=True)
                 initital_circuit_graph = circuit.to_graph()
                 # single extract pass through to reduce simple cancelations 
                 (initial_circuit, _) = extract_circuit(initital_circuit_graph)
                 initital_circuit_graph = initial_circuit.to_graph()
-                if tcount_from_graph(initital_circuit_graph) >= 10:
-                    circuit_generated = True
+
+                self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
+                self.reduced_zx_graph = initital_circuit_graph.clone()
+                zx.full_reduce(self.reduced_zx_graph)
+
+                self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
+                if np.random.random() < 0.5:
+                    if (self.baseline_t_count-self.pyzx_t_count)/self.baseline_t_count >= self.min_t_count_diff:
+                        circuit_generated = True
+                else:
+                    if self.baseline_t_count >= 10:
+                        circuit_generated = True
+        
         self.state_circuit_initial = initial_circuit
         self.state_zx_graph_initital = initital_circuit_graph.clone()
         self.state_zx_graph = initital_circuit_graph.clone()
 
         # extract pyzx based graph and circuit
-        self.reduced_zx_graph = initital_circuit_graph.clone()
-        zx.full_reduce(self.reduced_zx_graph)
-
-        self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
         self.reduced_zx_circuit = zx.extract_circuit(self.reduced_zx_graph)
 
-        self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
         self.baseline_cnot_count = initial_circuit.stats_dict()['twoqubit']
         self.pyzx_cnot_count = self.reduced_zx_circuit.stats_dict()['twoqubit']
 
