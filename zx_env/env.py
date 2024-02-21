@@ -141,6 +141,14 @@ class zx_env(gym.Env):
                     if self.baseline_t_count >= 10:
                         circuit_generated = True
         
+        else:
+            (initial_circuit, _) = extract_circuit(initital_circuit_graph)
+            initital_circuit_graph = initial_circuit.to_graph()
+            self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
+            self.reduced_zx_graph = initital_circuit_graph.clone()
+            zx.full_reduce(self.reduced_zx_graph)
+            self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
+
         self.state_circuit_initial = initial_circuit
         self.state_zx_graph_initital = initital_circuit_graph.clone()
         self.state_zx_graph = initital_circuit_graph.clone()
