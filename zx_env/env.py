@@ -135,7 +135,7 @@ class zx_env(gym.Env):
 
                 self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
                 if np.random.random() < 0.5:
-                    if (self.baseline_t_count-self.pyzx_t_count)/self.baseline_t_count >= self.min_t_count_diff:
+                    if (self.baseline_t_count-self.pyzx_t_count)/(self.baseline_t_count+1e-5) >= self.min_t_count_diff:
                         circuit_generated = True
                 else:
                     if self.baseline_t_count >= 10:
