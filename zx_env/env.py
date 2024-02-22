@@ -58,7 +58,7 @@ class zx_env(gym.Env):
     def __init__(self, n_qubits = 5, depth = 250, rules_list = None, max_steps=100, h_ratio = 0.3, t_ratio = 0.5, mq_ratio = 0.1,
         graph_type = "homogeneous", random_location=True, add_no_action=False,
         mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_t_count_diff=0.1,
-        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom") -> None:
+        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0) -> None:
         super().__init__()
 
         self.h_ratio = h_ratio
@@ -73,15 +73,16 @@ class zx_env(gym.Env):
         self.mutation_steps = mutation_steps
         self.min_t_count_diff = min_t_count_diff
         self.circuit_extraction_type = circuit_extraction_type
-        self.negative_reward = -0.1
+        self.negative_reward_mean = negative_reward_mean
+        self.negative_reward_std = negative_reward_std
         if reward_fn == "normalized_t_count_reward":
             self.reward_fn = rf.normalized_t_count_reward
         elif reward_fn == "absolute_t_count_reward":
             self.reward_fn = rf.absolute_t_count_reward
-            self.negative_reward = -2
+            #self.negative_reward = -2
         elif reward_fn == "absolute_cnot_count_reward":
             self.reward_fn = rf.absolute_cnot_count_reward
-            self.negative_reward = -2
+            #self.negative_reward = -2
         elif reward_fn == "normalized_cnot_count_reward":
             self.reward_fn = rf.normalized_cnot_count_reward
         elif reward_fn == "pyzx_normalized_t_count_reward":
@@ -363,7 +364,7 @@ class zx_env(gym.Env):
                 reward = -1000
 
             if reward == 0:
-                reward = self.negative_reward  
+                reward = self.negative_reward_mean + self.negative_reward_std*np.random.randn()  
         
         self.state = self.converter(self.state_zx_graph)
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
