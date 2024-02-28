@@ -247,15 +247,26 @@ class zx_env(gym.Env):
         
         return match_name, match_tupples, match_num
 
+
     #@profile
-    def step(self, action: ActType, position: int | None = None, location: int | None = None) -> Tuple[ObsType, float, bool, bool, dict]:
+    def step(self, action: ActType, position: int | None = None, location: int | None = None,pyzx_state : Any | None = None) -> Tuple[ObsType, float, bool, bool, dict]:
         #print("entry step", len(list(self.state_zx_graph.ty.keys())))
         #err_msg = f"{action!r} ({type(action)}) invalid"
         #assert self.action_space.contains(action), err_msg
         assert self.state is not None, "Call reset before using step method."
 
+        if pyzx_state is not None:
+            self.state_zx_graph = pyzx_state.clone()
+            self.state = self.converter(self.state_zx_graph)
+            self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
+            self.state = T.ToUndirected()(self.state)
+            self.compute_action_masks()
+            assert self.action_masks[:,1:][action,position]==1
+
+
         truncated = False
         terminated = False
+        isdead=False
 
         """if action == self.action_space.n:
             done = True"""
@@ -294,6 +305,7 @@ class zx_env(gym.Env):
                         prev_graph = self.state_zx_graph.clone()
 
                         try:
+                            #print("executing action",match_name,"at position",position)
                             if match_name == "unspider":
                                 info["match_num"] = position
                                 neighbor=[list(self.state_zx_graph.neighbors(location))[0]]
@@ -302,14 +314,17 @@ class zx_env(gym.Env):
                             else:
                                 info["match_num"] = position
                                 rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=location)
-
+                            #print("applied action")
                             reward = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
                         
                         except Exception as e:
+                            #print("EXCEPTION DURING EXTRACTION")
                             logger.exception(e)
-                            reward = -99
+                            reward = -10
                             self.state_zx_graph = prev_graph
+                            terminated=True
+                            isdead=True
 
             else:
                 print("ACTION NOT MASKED!!!")
@@ -322,9 +337,8 @@ class zx_env(gym.Env):
             
         if self.step_counter >= self._max_episode_steps:
             truncated = True
-        terminated =False
         
-        if terminated or truncated:
+        if (terminated or truncated) and not isdead:
 
             
             success = check_equality(self.state_zx_graph_initital, self.state_zx_graph)
