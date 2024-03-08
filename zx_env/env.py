@@ -100,7 +100,7 @@ class zx_env(gym.Env):
         self.random_location=random_location
         
         if rules_list is not None:
-            self.rule_func_list = dir(rules)
+            #self.rule_func_list = dir(rules)
             self.rules_list = ["match_"+r for r in rules_list]
         else:
             self.rule_func_list = dir(rules)
@@ -121,6 +121,7 @@ class zx_env(gym.Env):
         
         self.step_counter = 0
         circuit_generated = False
+        print("reset start")
 
         if initital_circuit_graph == None:
             while not circuit_generated:
@@ -160,11 +161,11 @@ class zx_env(gym.Env):
 
         self.baseline_cnot_count = initial_circuit.stats_dict()['twoqubit']
         self.pyzx_cnot_count = self.reduced_zx_circuit.stats_dict()['twoqubit']
-
+        print("pre morph")
         # morph the graph
         if np.random.rand() < self.mutate_probability:
             mutation_counter = 0
-            while mutation_counter < self.mutation_steps:
+            for mutation_counter in range(self.mutation_steps):
                 action = np.random.randint(len(self.rules_list))
                 match_name, match_tupples, match_num = self.select_match_tupples(action)
                 rewrite = getattr(rules, match_name)
@@ -175,8 +176,8 @@ class zx_env(gym.Env):
                         rules.unspider(self.state_zx_graph, [match_tupples[match_num],neighbor, new_phase])
                     else:
                         rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=match_tupples[match_num])
-                    mutation_counter += 1
-        
+                    #mutation_counter += 1
+        print("post morph")
         self.state = self.converter(self.state_zx_graph)
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
         self.state = T.ToUndirected()(self.state)
