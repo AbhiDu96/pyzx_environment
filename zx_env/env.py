@@ -99,12 +99,13 @@ class zx_env(gym.Env):
             self.converter = pyzx_to_heterogeneous_torchData
         self.random_location=random_location
         
-        if rules_list != None:
-            self.rules_list = rules_list
+        if rules_list is not None:
+            self.rule_func_list = dir(rules)
+            self.rules_list = ["match_"+r for r in rules_list]
         else:
             self.rule_func_list = dir(rules)
             self.rules_list = [r for r in self.rule_func_list if "match_" in r]
-
+        print("rules",self.rules_list)
         self.state_zx_graph_initital = None
         self.state_zx_graph = None
         self.state = None
@@ -337,7 +338,13 @@ class zx_env(gym.Env):
             
         if self.step_counter >= self._max_episode_steps:
             truncated = True
-        
+        self.state = self.converter(self.state_zx_graph)
+        self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
+        self.state = T.ToUndirected()(self.state)
+        self.compute_action_masks()
+        if np.all(self.action_masks[:,1:]==0):
+            print("no action possible")
+            terminated = True
         if (terminated or truncated) and not isdead:
 
             
@@ -380,10 +387,8 @@ class zx_env(gym.Env):
             if reward == 0:
                 reward = self.negative_reward_mean + self.negative_reward_std*np.random.randn()  
         
-        self.state = self.converter(self.state_zx_graph)
-        self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
-        self.state = T.ToUndirected()(self.state)
-        self.compute_action_masks()
+        
+        
 
         return [self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], reward, terminated, truncated, info
         
