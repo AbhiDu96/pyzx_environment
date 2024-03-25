@@ -134,7 +134,8 @@ class zx_env(gym.Env):
                     # single extract pass through to reduce simple cancelations 
                     (initial_circuit, _) = extract_circuit(initital_circuit_graph)
                     initital_circuit_graph = initial_circuit.to_graph()
-
+                else:
+                    initial_circuit = copy.deepcopy(circuit)
                 self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
                 self.reduced_zx_graph = initital_circuit_graph.clone()
                 zx.full_reduce(self.reduced_zx_graph)
