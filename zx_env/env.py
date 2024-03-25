@@ -117,7 +117,8 @@ class zx_env(gym.Env):
         self.observation_space = gym.spaces.Discrete(5)
 
     
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None) -> Tuple[ObsType, dict]:
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
+                simplfy_initial_circuit = False) -> Tuple[ObsType, dict]:
         
         self.step_counter = 0
         circuit_generated = False
@@ -128,9 +129,11 @@ class zx_env(gym.Env):
                 circuit = random_circuit(n_qubit=self.n_qubits, num_gates=self.n_depth, p_two_qubit=self.mq_ratio, p_H=self.h_ratio, 
                             p_z=self.t_ratio/2, p_x=1-(self.mq_ratio+self.h_ratio+(self.t_ratio/2)), clifford_plus_T=True)
                 initital_circuit_graph = circuit.to_graph()
-                # single extract pass through to reduce simple cancelations 
-                (initial_circuit, _) = extract_circuit(initital_circuit_graph)
-                initital_circuit_graph = initial_circuit.to_graph()
+                
+                if simplfy_initial_circuit:
+                    # single extract pass through to reduce simple cancelations 
+                    (initial_circuit, _) = extract_circuit(initital_circuit_graph)
+                    initital_circuit_graph = initial_circuit.to_graph()
 
                 self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
                 self.reduced_zx_graph = initital_circuit_graph.clone()
