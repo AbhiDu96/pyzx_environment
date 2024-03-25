@@ -2,7 +2,8 @@ import numpy as np
 import pyzx as zx
 from fractions import Fraction
 
-def random_circuit(n_qubit=5, num_gates=40, p_two_qubit=0.1, p_H=0.7, p_z=0.1, p_x=0.1, many_pi_gates=False,clifford_plus_T=False):
+def random_circuit(n_qubit=5, num_gates=40, p_two_qubit=0.1, p_H=0.7, p_z=0.1, p_x=0.1, many_pi_gates=False,clifford_plus_T=False, 
+    add_cz=False):
     '''Sample a random circuit
        n_qubit: number of qubits
        num_gates: total number of gates in the circuit
@@ -23,10 +24,11 @@ def random_circuit(n_qubit=5, num_gates=40, p_two_qubit=0.1, p_H=0.7, p_z=0.1, p
                 if not control==target:
                     break
             two_qubit_gate=np.random.choice(range(2))
-            if two_qubit_gate==0:
-                c.add_gate("CNOT",control,target)
-            else:
+            if two_qubit_gate==0 and add_cz:
                 c.add_gate("CZ",control,target)
+            else:
+                c.add_gate("CNOT",control,target)
+                
         elif gate==1: # add Hadamard gate
             qubit=np.random.choice(range(n_qubit))
             c.add_gate("H", qubit) 
