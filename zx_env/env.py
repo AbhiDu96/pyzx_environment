@@ -23,6 +23,7 @@ except AttributeError:
     def profile(func): return func
     builtins.profile = profile
 
+from matplotlib import pyplot as plt
 
 import logging
 import logging
@@ -149,8 +150,11 @@ class zx_env(gym.Env):
                         circuit_generated = True
         
         else:
-            (initial_circuit, _) = extract_circuit(initital_circuit_graph)
-            initital_circuit_graph = initial_circuit.to_graph()
+            if simplfy_initial_circuit:
+                (initial_circuit, _) = extract_circuit(initital_circuit_graph)
+                initital_circuit_graph = initial_circuit.to_graph()
+            else:
+                initial_circuit = zx.Circuit.from_graph(initital_circuit_graph)
             self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
             self.reduced_zx_graph = initital_circuit_graph.clone()
             zx.full_reduce(self.reduced_zx_graph)
@@ -186,6 +190,10 @@ class zx_env(gym.Env):
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
         self.state = T.ToUndirected()(self.state)
         self.compute_action_masks()
+        #fig=zx.draw_matplotlib(self.state_zx_graph)
+        #fig.savefig("test.png")
+        print("N actions",self.action_masks[:,1:].sum())
+
         return ([self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], {})
     
     def compute_action_masks(self):
