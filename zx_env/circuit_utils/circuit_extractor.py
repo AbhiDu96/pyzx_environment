@@ -32,11 +32,11 @@ def extract_circuit(graph, quiet=True):
     for relax_level in [1,2,3,4]:
         interior_clifford_simp_on_wire(g, relax_level, quiet=quiet, stats=None)
         try:
-            return (zx.extract_circuit(copy.deepcopy(g)), relax_level)
+            return (zx.extract_circuit(copy.deepcopy(g), up_to_perm=False), relax_level)
         except:
             if relax_level==4:
                 zx.full_reduce(g)
-                return (zx.extract_circuit(g), 5)
+                return (zx.extract_circuit(g, up_to_perm=False), 5)
             
 
 

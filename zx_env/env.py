@@ -359,9 +359,9 @@ class zx_env(gym.Env):
             print("no action possible")
             terminated = True
         if (terminated or truncated) and not isdead:
-
+            print("TERMINATED",terminated,truncated,isdead)
             
-            success = check_equality(self.state_zx_graph_initital, self.state_zx_graph)
+            success = check_equality(self.state_zx_graph_initital.clone(), self.state_zx_graph.clone())
             
 
             if success:
@@ -373,7 +373,7 @@ class zx_env(gym.Env):
                 if self.circuit_extraction_type == "custom":
                     (circuit, _) = extract_circuit(self.state_zx_graph.clone())
                 else:
-                    zx.full_reduce(self.state_zx_graph)
+                    zx.full_reduce(self.state_zx_graph.clone())
                     circuit = zx.extract_circuit(self.state_zx_graph.clone())
 
                 current_cnot_count = circuit.stats_dict()['twoqubit']
