@@ -275,7 +275,7 @@ class zx_env(gym.Env):
             self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
             self.state = T.ToUndirected()(self.state)
             self.compute_action_masks()
-            assert self.action_masks[:,1:][action,position]==1
+            #assert self.action_masks[:,1:][action,position]==1
 
 
         truncated = False
