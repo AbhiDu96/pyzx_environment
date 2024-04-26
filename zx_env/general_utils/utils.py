@@ -1,13 +1,31 @@
 import pyzx as zx
 import fractions
 import copy
+from pyzx import EdgeType
 
-def check_equality(g1,g2):
+"""def check_equality(g1,g2):
     g_combined=g1+g2.adjoint()
     zx.full_reduce(g_combined)
     # next line: if a graph corresponds to the identity it has the same number of edges as qubits
     # and correspondingly as inputs
     if (len(g_combined.inputs())==len(list(g_combined.edges()))):
+        return True
+    else:
+        return False
+"""
+def check_equality(g1,g2):
+    '''Function checks if two graphs g1 and g2 are the same. It combines g1 with the adjoint of g2 and then 
+    applies full_reduce. If the resulting graph only contains input and output nodes and the conneting lines are not 
+    Hadamard edges, it returnes True, otherwise False. Note, however, that the result False does not mean that the graphs 
+    are not the same but only that te reduction did not succeed. Futher note, that if g1=g2 up to permutations, the function
+    still returns True.'''
+    g_combined=copy.deepcopy(g1)+copy.deepcopy(g2.adjoint())
+    zx.full_reduce(g_combined)
+    # next line: if a graph corresponds to the identity it has the same number of edges as qubits
+    # and correspondingly as inputs
+    if (len(g_combined.inputs())==len(list(g_combined.edges()))):
+        if EdgeType.HADAMARD in [g_combined.edge_type(e) for e in g_combined.edges()]:
+            return False
         return True
     else:
         return False

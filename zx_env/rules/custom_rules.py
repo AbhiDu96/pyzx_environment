@@ -104,20 +104,22 @@ def bialgebra(g, match):
         # have to unfuse them.
         
         neighbors=list(g.neighbors(v))
-        # remove the neighbor w s.t. unfusion is not done in the direction of the bialgebra rule.
-        # Take any other neighbor, here the first element of the neighbors
-        neighbors.remove(w)
-        neighbor=neighbors[0]
-        to_unpider=[v, [neighbor]]
-        unspider(g,to_unpider)
+        if not g.phase(v)==0:
+            # remove the neighbor w s.t. unfusion is not done in the direction of the bialgebra rule.
+            # Take any other neighbor, here the first element of the neighbors
+            neighbors.remove(w)
+            neighbor=neighbors[0]
+            to_unpider=[v, [neighbor]]
+            unspider(g,to_unpider)
         
-        neighbors=list(g.neighbors(w))
-        # remove the neighbor w s.t. unfusion is not done in the direction of the bialgebra rule.
-        # Take any other neighbor, here the first element of the neighbors
-        neighbors.remove(v)
-        neighbor=neighbors[0]
-        to_unpider=[w, [neighbor]]
-        unspider(g,to_unpider)
+        if not g.phase(w)==0:
+            neighbors=list(g.neighbors(w))
+            # remove the neighbor w s.t. unfusion is not done in the direction of the bialgebra rule.
+            # Take any other neighbor, here the first element of the neighbors
+            neighbors.remove(v)
+            neighbor=neighbors[0]
+            to_unpider=[w, [neighbor]]
+            unspider(g,to_unpider)
 
         ###################################
         
@@ -479,6 +481,58 @@ def unspider(g, m, qubit=-1,  row=-1):
         g.set_phase(v, g.phase(u))
         g.set_phase(u, 0)
     return v
+
+def match_complete_unfuse(
+        g: BaseGraph[VT, ET],
+        vertexf: Optional[Callable[[VT], bool]] = None
+        ) -> List[VT]:
+    if vertexf is not None: candidates = set([v for v in g.vertices() if vertexf(v)])
+    else: candidates = g.vertex_set()
+    types = g.types()
+
+    return [v for v in candidates if ((types[v] == VertexType.Z) or (types[v] == VertexType.X)) and len(g.neighbors(v))>3]
+
+
+def complete_unfuse(g, match):
+    etab = {}
+    rem_verts = []
+    rem_edges = []
+    
+    neighbors=g.neighbors(match)
+    n_neighbors=len(neighbors)
+
+    v_type=g.type(match)
+    phase=g.phase(match)
+    
+    added_vert=[]
+    for v in neighbors:
+        
+        kr=0.2
+        kq=0.5
+        r = (1-kr)*g.row(match)+kr*g.row(v)
+        q = (1-kq)*g.qubit(match) + kq*g.qubit(v)
+        
+        
+        w=g.add_vertex(v_type, q,r)
+        added_vert.append(w)
+        old_edge=g.edge(v,match)
+        new_edge=g.edge(v,w)
+        old_type=g.edge_type(old_edge)
+        if old_type==EdgeType.SIMPLE:
+            etab[new_edge]=[1,0]
+        else:
+            etab[new_edge]=[0,1]
+        rem_edges.append(old_edge)
+        
+    g.set_phase(added_vert[0],phase)
+    
+    for w1 in added_vert:
+        for w2 in added_vert:
+            if not w1==w2:
+                etab[g.edge(w1,w2)]=[1,0]
+
+    rem_verts=[match]
+    return (etab, rem_verts, rem_edges, False)
 
 
 ### Hard rules ########################
