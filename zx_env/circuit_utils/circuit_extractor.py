@@ -8,7 +8,7 @@ from fractions import Fraction
 
 
 
-def extract_circuit(graph, quiet=True):
+def extract_circuit(graph, quiet=True, up_to_perm=False):
     '''The new circuit extraction method makes use of graph-like states, the local complementation
        rule as well as the pivoting rule. It tries to use these rules as carefully as possibly to avoid
        introducing too many CX gates.
@@ -32,11 +32,11 @@ def extract_circuit(graph, quiet=True):
     for relax_level in [1,2,3,4]:
         interior_clifford_simp_on_wire(g, relax_level, quiet=quiet, stats=None)
         try:
-            return (zx.extract_circuit(copy.deepcopy(g), up_to_perm=False), relax_level)
+            return (zx.extract_circuit(copy.deepcopy(g), up_to_perm=up_to_perm), relax_level)
         except:
             if relax_level==4:
                 zx.full_reduce(g)
-                return (zx.extract_circuit(g, up_to_perm=False), 5)
+                return (zx.extract_circuit(g, up_to_perm=up_to_perm), 5)
             
 
 
