@@ -59,7 +59,7 @@ class zx_env(gym.Env):
     def __init__(self, n_qubits = 5, depth = 250, rules_list = None, max_steps=100, h_ratio = 0.3, t_ratio = 0.5, mq_ratio = 0.1,
         graph_type = "homogeneous", random_location=True, add_no_action=False,
         mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_t_count_diff=0.1,
-        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0) -> None:
+        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0, full_fuse_every_step=False) -> None:
         super().__init__()
 
         self.h_ratio = h_ratio
@@ -116,6 +116,7 @@ class zx_env(gym.Env):
         self.step_counter = 0
         # this is just a dummy to make gymnasium happy
         self.observation_space = gym.spaces.Discrete(5)
+        self.full_fuse_every_step=full_fuse_every_step
 
     
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
@@ -346,7 +347,8 @@ class zx_env(gym.Env):
             
         else:
             info["applied_rule"] = "No rule applied"
-
+        if self.full_fuse_every_step:
+            rules.full_fuse(self.state_zx_graph)
         self.step_counter += 1
             
         if self.step_counter >= self._max_episode_steps:
