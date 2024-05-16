@@ -59,7 +59,7 @@ class zx_env(gym.Env):
     def __init__(self, n_qubits = 5, depth = 250, rules_list = None, max_steps=100, h_ratio = 0.3, t_ratio = 0.5, mq_ratio = 0.1,
         graph_type = "homogeneous", random_location=True, add_no_action=False,
         mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_t_count_diff=0.1,
-        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0, full_fuse_every_step=False) -> None:
+        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0, full_fuse_every_step=False,reduce_at_reset=False) -> None:
         super().__init__()
 
         self.h_ratio = h_ratio
@@ -117,6 +117,7 @@ class zx_env(gym.Env):
         # this is just a dummy to make gymnasium happy
         self.observation_space = gym.spaces.Discrete(5)
         self.full_fuse_every_step=full_fuse_every_step
+        self.reduce_at_reset = reduce_at_reset
 
     
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
@@ -124,6 +125,7 @@ class zx_env(gym.Env):
         
         self.step_counter = 0
         circuit_generated = False
+        #simplfy_initial_circuit = simplfy_initial_circuit or self.reduce_at_reset
         print("reset start")
 
         if initital_circuit_graph == None:
@@ -148,8 +150,7 @@ class zx_env(gym.Env):
                         circuit_generated = True
                 else:
                     if self.baseline_t_count >= 10:
-                        circuit_generated = True
-        
+                        circuit_generated = True        
         else:
             if simplfy_initial_circuit:
                 (initial_circuit, _) = extract_circuit(initital_circuit_graph)
@@ -160,7 +161,6 @@ class zx_env(gym.Env):
             self.reduced_zx_graph = initital_circuit_graph.clone()
             zx.full_reduce(self.reduced_zx_graph)
             self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
-
         self.state_circuit_initial = initial_circuit
         self.state_zx_graph_initital = initital_circuit_graph.clone()
         self.state_zx_graph = initital_circuit_graph.clone()
@@ -187,6 +187,11 @@ class zx_env(gym.Env):
                         rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=match_tupples[match_num])
                     #mutation_counter += 1
         print("post morph")
+        if self.reduce_at_reset:
+            print("reform")
+            rules.full_fuse(self.state_zx_graph)
+
+
         self.state = self.converter(self.state_zx_graph)
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
         self.state = T.ToUndirected()(self.state)
@@ -194,8 +199,10 @@ class zx_env(gym.Env):
         #fig=zx.draw_matplotlib(self.state_zx_graph)
         #fig.savefig("test.png")
         print("N actions",self.action_masks[:,1:].sum())
+        reward = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
+                                pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
 
-        return ([self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], {})
+        return ([self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], {"reward":reward})
     
     def compute_action_masks(self):
         self.action_masks = []
