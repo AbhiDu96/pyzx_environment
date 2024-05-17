@@ -199,10 +199,11 @@ class zx_env(gym.Env):
         #fig=zx.draw_matplotlib(self.state_zx_graph)
         #fig.savefig("test.png")
         print("N actions",self.action_masks[:,1:].sum())
-        reward = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
+        info = dict()
+        reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
-
-        return ([self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], {"reward":reward})
+        info["reward"]=reward
+        return ([self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], info)
     
     def compute_action_masks(self):
         self.action_masks = []
@@ -337,7 +338,7 @@ class zx_env(gym.Env):
                                 info["match_num"] = position
                                 rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=location)
                             #print("applied action")
-                            reward = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
+                            reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
                         
                         except Exception as e:
@@ -350,8 +351,7 @@ class zx_env(gym.Env):
 
             else:
                 print("ACTION NOT MASKED!!!")
-                reward = -199
-            
+                reward = -199            
         else:
             info["applied_rule"] = "No rule applied"
         if self.full_fuse_every_step:
@@ -374,7 +374,7 @@ class zx_env(gym.Env):
             
 
             if success:
-                reward = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
+                reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
 
                 current_t_count = tcount_from_graph(self.state_zx_graph)
