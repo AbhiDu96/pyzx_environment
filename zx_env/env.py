@@ -119,6 +119,18 @@ class zx_env(gym.Env):
         self.full_fuse_every_step=full_fuse_every_step
         self.reduce_at_reset = reduce_at_reset
 
+
+    def sample_circuit(self):
+        n_qubits = self.n_qubits if isinstance(self.n_qubits, int) else np.random.randint(*self.n_qubits)
+        n_depth = self.n_depth if isinstance(self.n_depth, int) else np.random.randint(*self.n_depth)
+        mq_ratio= self.mq_ratio if isinstance(self.mq_ratio, float) else np.random.uniform(*self.mq_ratio)
+        h_ratio= self.h_ratio if isinstance(self.h_ratio, float) else np.random.uniform(*self.h_ratio)
+        t_ratio = self.t_ratio if isinstance(self.t_ratio, float) else np.random.uniform(*self.t_ratio)
+        p_x = 1-(mq_ratio+h_ratio+(t_ratio/2))
+        circuit = random_circuit(n_qubit=n_qubits, num_gates=n_depth, p_two_qubit=mq_ratio, p_H=h_ratio, 
+            p_z=t_ratio/2, p_x=p_x, clifford_plus_T=True)
+        return circuit
+
     
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
                 simplfy_initial_circuit = False) -> Tuple[ObsType, dict]:
@@ -130,8 +142,7 @@ class zx_env(gym.Env):
 
         if initital_circuit_graph == None:
             while not circuit_generated:
-                circuit = random_circuit(n_qubit=self.n_qubits, num_gates=self.n_depth, p_two_qubit=self.mq_ratio, p_H=self.h_ratio, 
-                            p_z=self.t_ratio/2, p_x=1-(self.mq_ratio+self.h_ratio+(self.t_ratio/2)), clifford_plus_T=True)
+                circuit = self.sample_circuit()
                 initital_circuit_graph = circuit.to_graph()
                 
                 if simplfy_initial_circuit:
