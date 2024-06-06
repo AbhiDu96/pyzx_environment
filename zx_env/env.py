@@ -12,7 +12,7 @@ import zx_env.general_utils.reward_functions as rf
 from zx_env.general_utils.utils import check_equality, tcount_from_graph
 from zx_env.circuit_utils.circuit_extractor import extract_circuit
 from zx_env.circuit_utils.grpah_format_converter_indexAdjusted import pyzx_to_heterogeneous_torchData, pyzy_to_homogeneous_torchData
-
+import glob
 # For profilining
 import builtins
 
@@ -118,6 +118,7 @@ class zx_env(gym.Env):
         self.observation_space = gym.spaces.Discrete(5)
         self.full_fuse_every_step=full_fuse_every_step
         self.reduce_at_reset = reduce_at_reset
+        self.bench_mark()
 
 
     def sample_circuit(self):
@@ -131,7 +132,15 @@ class zx_env(gym.Env):
             p_z=t_ratio/2, p_x=p_x, clifford_plus_T=True)
         return circuit
 
-    
+    def bench_mark(self, path="zx_env/bench_mark_circuits/"):
+
+        self.benchmakr_circuit_name = glob.glob(path+"*/*", recursive=True)
+        self.benchmark_graphs = []
+        for circ in self.benchmakr_circuit_name:
+            self.benchmark_graphs.append(zx.Circuit.from_quipper_file(circ))
+        
+
+
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
                 simplfy_initial_circuit = False) -> Tuple[ObsType, dict]:
         
