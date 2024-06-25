@@ -31,7 +31,7 @@ def normalized_cnot_count_reward(zx_graph, baseline_t_count, baseline_cnot_count
     
     current_cnot_count = circuit.stats_dict()['twoqubit']
 
-    return 1 - (current_cnot_count/baseline_cnot_count), level
+    return 1 - (current_cnot_count/(max(baseline_cnot_count,1e-5))), level
 
 def pyzx_normalized_t_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):
 
