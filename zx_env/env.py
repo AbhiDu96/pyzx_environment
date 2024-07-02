@@ -139,7 +139,20 @@ class zx_env(gym.Env):
         for circ in self.benchmakr_circuit_name:
             self.benchmark_graphs.append(zx.Circuit.from_quipper_file(circ))
         
-
+    def mk_features(self):
+        circ = extract_circuit(self.state_zx_graph)[0]
+        stats = circ.stats_dict(depth=True)
+        gates = stats["gates"]
+        tcount = stats["tcount"]
+        clifford = stats["clifford"]
+        twoqubit = stats["twoqubit"]
+        cnot = stats["cnot"]
+        had = stats["had"]
+        depth = stats["depth"]
+        depth_cz = stats["depth_cz"]
+        edges = self.state_zx_graph.num_edges()
+        feat = torch.tensor([gates,tcount,clifford,twoqubit,cnot,had,depth,depth_cz,edges]).float()
+        return feat
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
                 simplfy_initial_circuit = False) -> Tuple[ObsType, dict]:
@@ -223,6 +236,7 @@ class zx_env(gym.Env):
         reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
         info["reward"]=reward
+        info["feats"]=self.mk_features()
         return ([self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], info)
     
     def compute_action_masks(self):
@@ -431,6 +445,6 @@ class zx_env(gym.Env):
         
         
         
-
+        info["feats"]=self.mk_features()
         return [self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], reward, terminated, truncated, info
         
