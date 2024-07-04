@@ -142,16 +142,18 @@ class zx_env(gym.Env):
     def mk_features(self):
         circ = extract_circuit(self.state_zx_graph)[0]
         stats = circ.stats_dict(depth=True)
-        gates = stats["gates"]
-        tcount = stats["tcount"]
-        clifford = stats["clifford"]
-        twoqubit = stats["twoqubit"]
-        cnot = stats["cnot"]
-        had = stats["had"]
-        depth = stats["depth"]
-        depth_cz = stats["depth_cz"]
-        edges = self.state_zx_graph.num_edges()
-        feat = torch.tensor([gates,tcount,clifford,twoqubit,cnot,had,depth,depth_cz,edges]).float()
+        exp_qubits = self.n_qubits if isinstance(self.n_qubits, int) else np.mean(self.n_qubits)
+        exp_gates = self.n_depth if isinstance(self.n_depth, int) else np.mean(self.n_depth)
+        expected_size = exp_gates*exp_qubits
+        gates = stats["gates"]/expected_size
+        tcount = stats["tcount"]/expected_size
+        clifford = stats["clifford"]/expected_size
+        twoqubit = stats["twoqubit"]/expected_size
+        had = stats["had"]/expected_size
+        depth = stats["depth"]/expected_size
+        depth_cz = stats["depth_cz"]/expected_size
+        edges = self.state_zx_graph.num_edges()/expected_size
+        feat = torch.tensor([gates,tcount,clifford,twoqubit,had,depth,depth_cz,edges]).float()
         return feat
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
