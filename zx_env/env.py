@@ -153,7 +153,7 @@ class zx_env(gym.Env):
         depth = stats["depth"]/expected_size
         depth_cz = stats["depth_cz"]/expected_size
         edges = self.state_zx_graph.num_edges()/expected_size
-        feat = torch.tensor([gates,tcount,clifford,twoqubit,had,depth,depth_cz,edges]).float()
+        feat = torch.tensor([gates,tcount,clifford,twoqubit,had,depth,depth_cz]).float()
         return feat
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
@@ -162,7 +162,7 @@ class zx_env(gym.Env):
         self.step_counter = 0
         circuit_generated = False
         #simplfy_initial_circuit = simplfy_initial_circuit or self.reduce_at_reset
-        print("reset start")
+        #print("reset start")
 
         if initital_circuit_graph == None:
             while not circuit_generated:
@@ -205,7 +205,7 @@ class zx_env(gym.Env):
 
         self.baseline_cnot_count = initial_circuit.stats_dict()['twoqubit']
         self.pyzx_cnot_count = self.reduced_zx_circuit.stats_dict()['twoqubit']
-        print("pre morph")
+        #print("pre morph")
         # morph the graph
         if np.random.rand() < self.mutate_probability:
             mutation_counter = 0
@@ -221,7 +221,7 @@ class zx_env(gym.Env):
                     else:
                         rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=match_tupples[match_num])
                     #mutation_counter += 1
-        print("post morph")
+        #print("post morph")
         if self.reduce_at_reset:
             print("reform")
             rules.full_fuse(self.state_zx_graph)
@@ -233,12 +233,13 @@ class zx_env(gym.Env):
         self.compute_action_masks()
         #fig=zx.draw_matplotlib(self.state_zx_graph)
         #fig.savefig("test.png")
-        print("N actions",self.action_masks[:,1:].sum())
+        #print("N actions",self.action_masks[:,1:].sum())
         info = dict()
         reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
         info["reward"]=reward
         info["feats"]=self.mk_features()
+        info["action_mask"] = self.action_masks
         return ([self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], info)
     
     def compute_action_masks(self):
@@ -448,5 +449,6 @@ class zx_env(gym.Env):
         
         
         info["feats"]=self.mk_features()
+        info["action_mask"] = self.action_masks
         return [self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], reward, terminated, truncated, info
         
