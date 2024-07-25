@@ -153,7 +153,7 @@ class zx_env(gym.Env):
         depth = stats["depth"]/expected_size
         depth_cz = stats["depth_cz"]/expected_size
         edges = self.state_zx_graph.num_edges()/expected_size
-        feat = torch.tensor([gates,tcount,clifford,twoqubit,had,depth,depth_cz]).float()
+        feat = torch.tensor([gates,tcount,clifford,twoqubit,had,depth,depth_cz,edges]).float()
         return feat
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
@@ -450,5 +450,6 @@ class zx_env(gym.Env):
         
         info["feats"]=self.mk_features()
         info["action_mask"] = self.action_masks
+        info["reward"]=reward
         return [self.state, self.action_masks, self.state_zx_graph, self.node_masks, self.edge_masks, self.rule_mask], reward, terminated, truncated, info
         
