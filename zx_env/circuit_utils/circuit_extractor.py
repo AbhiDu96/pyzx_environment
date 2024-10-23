@@ -35,9 +35,11 @@ def extract_circuit(graph, quiet=True, up_to_perm=False):
             return (zx.extract_circuit(copy.deepcopy(g), up_to_perm=up_to_perm), relax_level)
         except:
             if relax_level==4:
-                zx.full_reduce(g)
-                return (zx.extract_circuit(g, up_to_perm=up_to_perm), 5)
-            
+                try:
+                    zx.full_reduce(g)
+                    return (zx.extract_circuit(g, up_to_perm=up_to_perm), 5)
+                except:
+                    raise Exception("full reduce failed")
 
 
 
