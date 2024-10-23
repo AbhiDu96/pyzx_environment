@@ -23,12 +23,14 @@ def normalized_t_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, p
 
 def normalized_cnot_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):
     level = 5
-    if circuit_extract_method == "custom":
-         (circuit, level) = extract_circuit(zx_graph)
-    else:
-        zx.full_reduce(zx_graph)
-        circuit = zx.extract_circuit(zx_graph)
-    
+    try:
+        if circuit_extract_method == "custom":
+            (circuit, level) = extract_circuit(zx_graph)
+        else:
+            zx.full_reduce(zx_graph)
+            circuit = zx.extract_circuit(zx_graph)
+    except:
+        raise Exception("extraction failed")
     current_cnot_count = circuit.stats_dict()['twoqubit']
 
     return 1 - (current_cnot_count/(max(baseline_cnot_count,1e-5))), level
