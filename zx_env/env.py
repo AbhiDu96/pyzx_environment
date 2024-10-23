@@ -379,7 +379,7 @@ class zx_env(gym.Env):
                             reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
                         
-                        except Exception as e:
+                        except (Exception,KeyError) as e:
                             #print("EXCEPTION DURING EXTRACTION")
                             logger.exception(e)
                             reward = -10
