@@ -187,6 +187,7 @@ class zx_env(gym.Env):
                     if self.baseline_t_count >= 10:
                         circuit_generated = True        
         else:
+            print("loading pre-done circuit")
             if simplfy_initial_circuit:
                 (initial_circuit, _) = extract_circuit(initital_circuit_graph)
                 initital_circuit_graph = initial_circuit.to_graph()
@@ -388,7 +389,9 @@ class zx_env(gym.Env):
 
             else:
                 print("ACTION NOT MASKED!!!")
-                reward = -199            
+                reward = -199 
+                terminated=True
+                truncated=True           
         else:
             info["applied_rule"] = "No rule applied"
         if self.full_fuse_every_step:
