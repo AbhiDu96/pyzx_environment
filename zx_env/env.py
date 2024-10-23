@@ -390,7 +390,8 @@ class zx_env(gym.Env):
                 print("ACTION NOT MASKED!!!")
                 reward = -199 
                 terminated=True
-                truncated=True           
+                truncated=True    
+                isdead=True       
         else:
             info["applied_rule"] = "No rule applied"
         if self.full_fuse_every_step:
