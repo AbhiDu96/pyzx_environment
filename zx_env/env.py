@@ -366,16 +366,16 @@ class zx_env(gym.Env):
                         prev_graph = self.state_zx_graph.clone()
 
                         #print("executing action",match_name,"at position",position)
-                        if match_name == "unspider":
-                            info["match_num"] = position
-                            neighbor=[list(self.state_zx_graph.neighbors(location))[0]]
-                            new_phase=Fraction(1,1)
-                            rules.unspider(self.state_zx_graph, [location,neighbor, new_phase])
-                        else:
-                            info["match_num"] = position
-                            rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=location)
-                        #print("applied action")
                         try:
+                            if match_name == "unspider":
+                                info["match_num"] = position
+                                neighbor=[list(self.state_zx_graph.neighbors(location))[0]]
+                                new_phase=Fraction(1,1)
+                                rules.unspider(self.state_zx_graph, [location,neighbor, new_phase])
+                            else:
+                                info["match_num"] = position
+                                rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=location)
+                        #print("applied action")
                             reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
                         except:
