@@ -11,7 +11,7 @@ from zx_env.circuit_utils.circuit_generator import random_circuit
 import zx_env.general_utils.reward_functions as rf
 from zx_env.general_utils.utils import check_equality, tcount_from_graph
 from zx_env.circuit_utils.circuit_extractor import extract_circuit
-from zx_env.circuit_utils.grpah_format_converter_indexAdjusted import pyzx_to_heterogeneous_torchData, pyzy_to_homogeneous_torchData
+from zx_env.circuit_utils.graph_format_converter_index_adjusted import pyzx_to_heterogeneous_torchData, pyzy_to_homogeneous_torchData
 import glob
 # For profilining
 import builtins
@@ -106,8 +106,8 @@ class zx_env(gym.Env):
         else:
             self.rule_func_list = dir(rules)
             self.rules_list = [r for r in self.rule_func_list if "match_" in r]
-        print("rules",self.rules_list)
-        self.state_zx_graph_initital = None
+        logging.debug("rules: %s", self.rules_list)
+        self.state_zx_graph_initial = None
         self.state_zx_graph = None
         self.state = None
 
@@ -156,7 +156,7 @@ class zx_env(gym.Env):
         feat = torch.tensor([gates,tcount,clifford,twoqubit,had,depth,depth_cz,edges]).float()
         return feat
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initital_circuit_graph = None,
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initial_circuit_graph = None,
                 simplfy_initial_circuit = False) -> Tuple[ObsType, dict]:
         
         self.step_counter = 0
@@ -164,19 +164,19 @@ class zx_env(gym.Env):
         #simplfy_initial_circuit = simplfy_initial_circuit or self.reduce_at_reset
         #print("reset start")
 
-        if initital_circuit_graph == None:
+        if initial_circuit_graph == None:
             while not circuit_generated:
                 circuit = self.sample_circuit()
-                initital_circuit_graph = circuit.to_graph()
+                initial_circuit_graph = circuit.to_graph()
                 
                 if simplfy_initial_circuit:
                     # single extract pass through to reduce simple cancelations 
-                    (initial_circuit, _) = extract_circuit(initital_circuit_graph)
-                    initital_circuit_graph = initial_circuit.to_graph()
+                    (initial_circuit, _) = extract_circuit(initial_circuit_graph)
+                    initial_circuit_graph = initial_circuit.to_graph()
                 else:
                     initial_circuit = copy.deepcopy(circuit)
-                self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
-                self.reduced_zx_graph = initital_circuit_graph.clone()
+                self.baseline_t_count = tcount_from_graph(initial_circuit_graph)
+                self.reduced_zx_graph = initial_circuit_graph.clone()
                 zx.full_reduce(self.reduced_zx_graph)
 
                 self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
@@ -187,19 +187,19 @@ class zx_env(gym.Env):
                     if self.baseline_t_count >= 10:
                         circuit_generated = True        
         else:
-            print("loading pre-done circuit")
+            logging.debug("loading pre-done circuit")
             if simplfy_initial_circuit:
-                (initial_circuit, _) = extract_circuit(initital_circuit_graph)
-                initital_circuit_graph = initial_circuit.to_graph()
+                (initial_circuit, _) = extract_circuit(initial_circuit_graph)
+                initial_circuit_graph = initial_circuit.to_graph()
             else:
-                initial_circuit = zx.Circuit.from_graph(initital_circuit_graph)
-            self.baseline_t_count = tcount_from_graph(initital_circuit_graph)
-            self.reduced_zx_graph = initital_circuit_graph.clone()
+                initial_circuit = zx.Circuit.from_graph(initial_circuit_graph)
+            self.baseline_t_count = tcount_from_graph(initial_circuit_graph)
+            self.reduced_zx_graph = initial_circuit_graph.clone()
             zx.full_reduce(self.reduced_zx_graph)
             self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
         self.state_circuit_initial = initial_circuit
-        self.state_zx_graph_initital = initital_circuit_graph.clone()
-        self.state_zx_graph = initital_circuit_graph.clone()
+        self.state_zx_graph_initial = initial_circuit_graph.clone()
+        self.state_zx_graph = initial_circuit_graph.clone()
 
         # extract pyzx based graph and circuit
         self.reduced_zx_circuit = zx.extract_circuit(self.reduced_zx_graph)
@@ -224,7 +224,7 @@ class zx_env(gym.Env):
                     #mutation_counter += 1
         #print("post morph")
         if self.reduce_at_reset:
-            print("reform")
+            logging.debug("reform")
             rules.full_fuse(self.state_zx_graph)
 
 
@@ -387,7 +387,7 @@ class zx_env(gym.Env):
                             isdead=True
 
             else:
-                print("ACTION NOT MASKED!!!")
+                logging.warning("ACTION NOT MASKED!!!")
                 reward = -199 
                 terminated=True
                 truncated=True    
@@ -405,12 +405,12 @@ class zx_env(gym.Env):
         self.state = T.ToUndirected()(self.state)
         self.compute_action_masks()
         if np.all(self.action_masks[:,1:]==0):
-            print("no action possible")
+            logging.info("no action possible")
             terminated = True
         if (terminated or truncated) and not isdead:
-            print("TERMINATED",terminated,truncated,isdead)
+            logging.info("terminated=%s truncated=%s isdead=%s", terminated, truncated, isdead)
             
-            success = check_equality(self.state_zx_graph_initital.clone(), self.state_zx_graph.clone())
+            success = check_equality(self.state_zx_graph_initial.clone(), self.state_zx_graph.clone())
             
 
             if success:

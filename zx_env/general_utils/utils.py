@@ -59,7 +59,7 @@ def tcount_from_graph(g):
         elif isinstance(phase, int):
             pass
         else:
-            print(type(phase))
+            import logging; logging.warning("unexpected phase type: %s", type(phase))
             assert 0, 'phases must be fractions or integers'
     return tcount
 
