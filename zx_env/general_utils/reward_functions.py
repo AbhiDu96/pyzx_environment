@@ -4,7 +4,9 @@ from zx_env.general_utils.utils import tcount_from_graph
 
 
 def absolute_t_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):
-    return baseline_t_count - tcount_from_graph(zx_graph)
+    # level is None: T-count rewards do not perform circuit extraction, so there is no extraction level
+    level = None
+    return baseline_t_count - tcount_from_graph(zx_graph), level
 
 def absolute_cnot_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):
     level = 5
@@ -19,7 +21,9 @@ def absolute_cnot_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, 
     return baseline_cnot_count - current_cnot_count, level
 
 def normalized_t_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):
-    return 1- (tcount_from_graph(zx_graph)/baseline_t_count)
+    # level is None: T-count rewards do not perform circuit extraction, so there is no extraction level
+    level = None
+    return 1- (tcount_from_graph(zx_graph)/baseline_t_count), level
 
 def normalized_cnot_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):
     level = 5
@@ -37,8 +41,10 @@ def normalized_cnot_count_reward(zx_graph, baseline_t_count, baseline_cnot_count
 
 def pyzx_normalized_t_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):
 
+    # level is None: T-count rewards do not perform circuit extraction, so there is no extraction level
+    level = None
     current_t_count = tcount_from_graph(zx_graph)
-    return 1 - ((baseline_t_count+current_t_count)/(baseline_t_count+pyzx_t_count))
+    return 1 - ((baseline_t_count+current_t_count)/(baseline_t_count+pyzx_t_count)), level
 
 
 def pyzx_normalized_cnot_count_reward(zx_graph, baseline_t_count, baseline_cnot_count, pyzx_t_count=None, pyzx_cnot_count=None, circuit_extract_method="custom"):

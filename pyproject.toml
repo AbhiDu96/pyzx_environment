@@ -1,0 +1,29 @@
+[project]
+name = "zx_env"
+version = "0.1.0"
+description = "Gymnasium RL environment for optimizing quantum circuits via ZX-diagram rewriting"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+    { name = "Alexander Mattick" },
+    { name = "Maniraman Periyasamy" },
+    { name = "Christian Ufrecht" },
+    { name = "Abhishek Y. Dubey" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium",
+    "numpy<2",  # code relies on numpy 1.x scalar-conversion semantics (int(np.where(...)[0]))
+    "pyzx==0.8.0",  # newest version compatible with the custom rewrite/extraction code;
+                    # 0.9+ removed the old `rules.pivot` 4-tuple match format, 0.10+ removed `pyzx.rules`
+    "torch",
+    "torch-geometric",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["zx_env"]

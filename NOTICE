@@ -1,0 +1,12 @@
+ZX RL/GNN Environment (zx_env)
+Copyright 2025-2026 Alexander Mattick, Maniraman Periyasamy, Christian Ufrecht, Abhishek Y. Dubey
+
+This product includes software developed for the paper
+"Optimizing Quantum Circuits via ZX Diagrams using Reinforcement Learning and
+Graph Neural Networks" (arXiv:2504.03429).
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this software except in compliance with the License. A copy of the License is
+provided in the LICENSE file and is also available at:
+
+    http://www.apache.org/licenses/LICENSE-2.0

@@ -57,7 +57,6 @@ def match_bialgebra(g: BaseGraph[VT,ET],
     else: candidates = g.edge_set()
     m = []
     types = g.types()
-    phases = g.phases()
     while len(candidates) > 0:
         e = candidates.pop()
         if g.edge_type(e) != EdgeType.SIMPLE: continue
@@ -66,28 +65,10 @@ def match_bialgebra(g: BaseGraph[VT,ET],
             v,w = w,v
         if types[v] != VertexType.X: continue
         if types[w] == VertexType.Z:
-            
-            # added the next line to remove trivial applications
+            # skip trivial applications where either spider has degree <= 2
             if len(g.neighbors(v))<=2 or len(g.neighbors(w))<=2: continue
-            
-            #I removed next line because I introuced an additional unfusion step in the bialgebra method
-            #if phases[v] != 0 or phases[w] != 0: continue
+            # phased spiders are matched too; the bialgebra rewrite unfuses their phase first
             m.append((v,w))
-            # I removed the next lines. We want all matches not only noninteracting ones. This
-            # is not a problem because we always only apply one rule at a time.
-            #for n in g.neighbors(v):
-            #    candidates.difference_update(g.incident_edges(n))
-            #for n in g.neighbors(w):
-            #    candidates.difference_update(g.incident_edges(n))
-            
-        # can be removed. We are not considering Hboxes  
-        #if types[w] == VertexType.H_BOX:
-        #    if phases[v] != 0 or phases[w] != 1: continue
-        #    m.append((v,w))
-        #    for n in g.neighbors(v):
-         #       candidates.difference_update(g.incident_edges(n))
-         #   for n in g.neighbors(w):
-         #       candidates.difference_update(g.incident_edges(n))
     return m
 
 
@@ -98,31 +79,22 @@ def bialgebra(g, match):
     etab = {}
 
     for v,w in matches:
-        #############################
-        # I added the following lines. In the original implementation of the matcher function,
-        # spiders with phases are excluded. I included them in the matcher function. As a result we first 
-        # have to unfuse them.
-        
+        # Phased spiders are matched too, so unfuse the phase first. Unfuse towards any
+        # neighbor other than the partner spider, i.e. away from the bialgebra direction.
         neighbors=list(g.neighbors(v))
         if not g.phase(v)==0:
-            # remove the neighbor w s.t. unfusion is not done in the direction of the bialgebra rule.
-            # Take any other neighbor, here the first element of the neighbors
             neighbors.remove(w)
             neighbor=neighbors[0]
-            to_unpider=[v, [neighbor]]
-            unspider(g,to_unpider)
-        
+            to_unspider=[v, [neighbor]]
+            unspider(g,to_unspider)
+
         if not g.phase(w)==0:
             neighbors=list(g.neighbors(w))
-            # remove the neighbor w s.t. unfusion is not done in the direction of the bialgebra rule.
-            # Take any other neighbor, here the first element of the neighbors
             neighbors.remove(v)
             neighbor=neighbors[0]
-            to_unpider=[w, [neighbor]]
-            unspider(g,to_unpider)
+            to_unspider=[w, [neighbor]]
+            unspider(g,to_unspider)
 
-        ###################################
-        
         rem_verts.append(v)
         rem_verts.append(w)
         new_verts = []
@@ -241,14 +213,10 @@ def match_pi_copy(
                 if phases[v] == 1 and vertex_is_zx(types[v])}
     if not paulis: return m
     
-    # attention! The elemnts in m (w,v) are not general edges but ordered, that is,
+    # attention! The elements in m (w,v) are not general edges but ordered, that is,
     # w is the Pauli and v the vertex we push it through
-    
-    while len(candidates) > 0:    
+    while len(candidates) > 0:
         v = candidates.pop()
-        # The next line prohibits pushing a Pauli gate through a Pauli gate. But why would
-        # we want to prohibit this?
-        # if v in paulis and g.vertex_degree(v) == 2: continue
         for w in g.neighbors(v):
             if w in paulis: break
         else:
@@ -261,12 +229,6 @@ def match_pi_copy(
                 (et == EdgeType.HADAMARD and types[w] == VertexType.Z)))
             ):
             m.append((w,v))
-            
-            #candidates.difference_update(g.neighbors(v))
-            #candidates.difference_update(g.neighbors(w))
-            
- 
-            
     return m
 
 
@@ -362,7 +324,7 @@ def add_hadamard_identity(g,match):
     matches=[match]
     for e in matches:
         rem_edges.append(e)
-        v1,v2 = g.edge_st(e) # v1,v2 Ränder der edges e
+        v1,v2 = g.edge_st(e)  # v1,v2 are the endpoints of edge e
         r = 0.5*(g.row(v1) + g.row(v2))
         q = 0.5*(g.qubit(v1) + g.qubit(v2))
         w = g.add_vertex(VertexType.Z, q,r, 0)
