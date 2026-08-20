@@ -5,34 +5,6 @@ from torch_geometric.data import Data, HeteroData
 from torch_geometric.utils.undirected import is_undirected
 import torch
 
-def calculate_edge_COO_undirected(pyzx_graph):
-    
-    graph_dict = pyzx_graph.graph
-    node_keys = np.array(list(pyzx_graph.ty.keys()))
-    rows, cols, edge_features = [], [], []
-    for k, values in graph_dict.items():
-        for i, edge_type in values.items():
-            k_loc = int(np.where(node_keys == k)[0])
-            i_loc = int(np.where(node_keys == i)[0])
-            rows.append(k_loc)
-            cols.append(i_loc)
-            edge_features.append(edge_type)
-    coo_mat = np.vstack((rows, cols))
-    return coo_mat, np.array(edge_features)
-
-def calculate_edge_COO_directed(pyzx_graph):
-    
-    rows, cols, edge_features = [], [], []
-    edge_Set = pyzx_graph.edge_set()
-
-    for edge in edge_Set:
-        rows.append(edge[0])
-        cols.append(edge[1])
-        edge_features.append(pyzx_graph.graph[edge[0]][edge[1]])
-
-    coo_mat = np.vstack((rows, cols))
-    return coo_mat, np.array(edge_features)
-
 
 def pyzx_to_homogeneous_torchData(pyzx_graph, label=None, graph_type=None):
     
@@ -53,43 +25,6 @@ def pyzx_to_homogeneous_torchData(pyzx_graph, label=None, graph_type=None):
     
     return torch_data
 
-def calculate_heterogeneous_edge_COO_directed(pyzx_graph, node_list1, node_list2):
-
-    rows, cols, edge_features = [], [], []
-
-    set_list = []
-
-    for node_1 in node_list1:
-        connected_nodes = pyzx_graph.graph[node_1]
-        for node_2 in list(connected_nodes.keys()):
-            if node_2 in node_list2 and set([node_1, node_2]) not in set_list:
-    
-                rows.append(int(np.where(node_list1 == node_1)[0]))
-                cols.append(int(np.where(node_list2 == node_2)[0]))
-                edge_features.append(connected_nodes[node_2])
-                set_list.append(set([node_1, node_2]))
-    
-    coo_mat = np.vstack((rows, cols))
-    return coo_mat, np.array(edge_features)
-
-def calculate_heterogeneous_edge_COO_undirected(pyzx_graph, node_list1, node_list2):
-
-    rows, cols, edge_features = [], [], []
-
-    set_list = []
-
-    for node_1 in node_list1:
-        connected_nodes = pyzx_graph.graph[node_1]
-        for node_2 in list(connected_nodes.keys()):
-            if node_2 in node_list2 and set([node_1, node_2]) not in set_list:
-                rows.append(node_1)
-                cols.append(node_2)
-                edge_features.append(connected_nodes[node_2])
-                set_list.append(set([node_1, node_2]))
-
-    coo_mat = np.vstack((rows+cols, cols+rows))
-    edge_features = edge_features+edge_features
-    return coo_mat, np.array(edge_features)
 
 def pyzx_to_heterogeneous_torchData(g, label=None, graph_type=None):
 
@@ -160,3 +95,70 @@ def pyzx_to_heterogeneous_torchData(g, label=None, graph_type=None):
         torch_data['xSpiders'].x = torch.tensor(0, dtype=torch.float32).reshape(-1,1)
 
     return torch_data
+
+
+def calculate_edge_COO_undirected(pyzx_graph):
+    
+    graph_dict = pyzx_graph.graph
+    node_keys = np.array(list(pyzx_graph.ty.keys()))
+    rows, cols, edge_features = [], [], []
+    for k, values in graph_dict.items():
+        for i, edge_type in values.items():
+            k_loc = int(np.where(node_keys == k)[0])
+            i_loc = int(np.where(node_keys == i)[0])
+            rows.append(k_loc)
+            cols.append(i_loc)
+            edge_features.append(edge_type)
+    coo_mat = np.vstack((rows, cols))
+    return coo_mat, np.array(edge_features)
+
+def calculate_edge_COO_directed(pyzx_graph):
+    
+    rows, cols, edge_features = [], [], []
+    edge_Set = pyzx_graph.edge_set()
+
+    for edge in edge_Set:
+        rows.append(edge[0])
+        cols.append(edge[1])
+        edge_features.append(pyzx_graph.graph[edge[0]][edge[1]])
+
+    coo_mat = np.vstack((rows, cols))
+    return coo_mat, np.array(edge_features)
+
+def calculate_heterogeneous_edge_COO_directed(pyzx_graph, node_list1, node_list2):
+
+    rows, cols, edge_features = [], [], []
+
+    set_list = []
+
+    for node_1 in node_list1:
+        connected_nodes = pyzx_graph.graph[node_1]
+        for node_2 in list(connected_nodes.keys()):
+            if node_2 in node_list2 and {node_1, node_2} not in set_list:
+    
+                rows.append(int(np.where(node_list1 == node_1)[0]))
+                cols.append(int(np.where(node_list2 == node_2)[0]))
+                edge_features.append(connected_nodes[node_2])
+                set_list.append({node_1, node_2})
+    
+    coo_mat = np.vstack((rows, cols))
+    return coo_mat, np.array(edge_features)
+
+def calculate_heterogeneous_edge_COO_undirected(pyzx_graph, node_list1, node_list2):
+
+    rows, cols, edge_features = [], [], []
+
+    set_list = []
+
+    for node_1 in node_list1:
+        connected_nodes = pyzx_graph.graph[node_1]
+        for node_2 in list(connected_nodes.keys()):
+            if node_2 in node_list2 and {node_1, node_2} not in set_list:
+                rows.append(node_1)
+                cols.append(node_2)
+                edge_features.append(connected_nodes[node_2])
+                set_list.append({node_1, node_2})
+
+    coo_mat = np.vstack((rows+cols, cols+rows))
+    edge_features = edge_features+edge_features
+    return coo_mat, np.array(edge_features)

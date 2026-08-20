@@ -1,7 +1,6 @@
 import pyzx as zx
 from pyzx import rules
-from pyzx.simplify import id_simp, spider_simp
-from pyzx.simplify import to_graph_like, spider_simp, to_gh,lcomp_simp,simp
+from pyzx.simplify import id_simp, spider_simp, to_graph_like, to_gh, lcomp_simp, simp
 import copy
 from pyzx.utils import VertexType, EdgeType, toggle_edge, vertex_is_zx, FloatInt, FractionLike
 from fractions import Fraction
@@ -42,46 +41,6 @@ def extract_circuit(graph, quiet=True, up_to_perm=False):
                     raise Exception("full reduce failed")
 
 
-
-
-
-def match_pivot_on_wire1(g, matchf=None, num=-1, check_edge_types=True):
-    return match_pivot_on_wire(g, level=1, matchf=matchf, num=num, check_edge_types=check_edge_types) 
-
-def match_pivot_on_wire2(g, matchf=None, num=-1, check_edge_types=True):
-    return match_pivot_on_wire(g, level=2, matchf=matchf, num=num, check_edge_types=check_edge_types)
-
-def match_pivot_on_wire3(g, matchf=None, num=-1, check_edge_types=True):
-    return match_pivot_on_wire(g, level=3, matchf=matchf, num=num, check_edge_types=check_edge_types)
-    
-
-
-def pivot_simp_on_wire(g, level=1, matchf=None, quiet=False, stats=None):
-    if level==1:
-        return simp(g, 'pivot_simp', match_pivot_on_wire1, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
-    if level==2:
-        return simp(g, 'pivot_simp', match_pivot_on_wire2, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
-    if level==3:
-        return simp(g, 'pivot_simp', match_pivot_on_wire3, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
-        
-    
-
-def match_lcomp_on_wire1(g, level=1,vertexf=None, num=-1, check_edge_types=True):
-    return  match_lcomp_on_wire(g, level=1,vertexf=vertexf, num=num, check_edge_types=check_edge_types)
-
-def match_lcomp_on_wire2(g, level=1,vertexf=None, num=-1, check_edge_types=True):
-    return  match_lcomp_on_wire(g, level=2,vertexf=vertexf, num=num, check_edge_types=check_edge_types)
-
-
-def lcomp_simp_on_wire(g,level=1, matchf=None, quiet=False, stats=None):
-    if level==1:
-        return simp(g, 'lcomp_simp', match_lcomp_on_wire1, rules.lcomp, matchf=matchf, quiet=quiet, stats=stats)
-    if level==2:
-        return simp(g, 'lcomp_simp', match_lcomp_on_wire2, rules.lcomp, matchf=matchf, quiet=quiet, stats=stats)
-
-
-
-
 def interior_clifford_simp_on_wire(g, relax_level=1, quiet=False, stats=None):
     """Keeps doing the simplifications ``id_simp``, ``spider_simp``,
     ``pivot_simp`` and ``lcomp_simp`` until none of them can be applied anymore."""
@@ -114,52 +73,37 @@ def interior_clifford_simp_on_wire(g, relax_level=1, quiet=False, stats=None):
     return i
 
 
-def match_lcomp_on_wire(g, level=1,vertexf=None, num=-1, check_edge_types=True):
-    """Finds noninteracting matchings of the local complementation rule.
+def pivot_simp_on_wire(g, level=1, matchf=None, quiet=False, stats=None):
+    if level==1:
+        return simp(g, 'pivot_simp', match_pivot_on_wire1, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
+    if level==2:
+        return simp(g, 'pivot_simp', match_pivot_on_wire2, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
+    if level==3:
+        return simp(g, 'pivot_simp', match_pivot_on_wire3, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
     
-    :param g: An instance of a ZX-graph.
-    :param num: Maximal amount of matchings to find. If -1 (the default)
-       tries to find as many as possible.
-    :param check_edge_types: Whether the method has to check if all the edges involved
-       are of the correct type (Hadamard edges).
-    :param vertexf: An optional filtering function for candidate vertices, should
-       return True if a vertex should be considered as a match. Passing None will
-       consider all vertices.
-    :rtype: List of 2-tuples ``(vertex, neighbors)``.
-    """
-    if vertexf is not None: candidates = set([v for v in g.vertices() if vertexf(v)])
-    else: candidates = g.vertex_set()
-    types = g.types()
-    phases = g.phases()
-    i = 0
-    m = []
-    while (num == -1 or i < num) and len(candidates) > 0:
-        v = candidates.pop()
-        
-        #### I added this line to only allow spiders with at most two neighbors
-        if level==1:
-            if len(g.neighbors(v))>2: continue
-        elif level==2:
-            pass
-        else:
-            raise ValueError('level must be either 1 or 2')
-        #####
-        
-        vt = types[v]
-        va = g.phase(v)
-        if vt != VertexType.Z: continue
-        if not (va == Fraction(1,2) or va == Fraction(3,2)): continue
-        if g.is_ground(v):
-            continue
-        if check_edge_types and not (
-            all(g.edge_type(e) == EdgeType.HADAMARD for e in g.incident_edges(v))
-            ): continue          
-        vn = list(g.neighbors(v))
-        if not all(types[n] == VertexType.Z for n in vn): continue
-        for n in vn: candidates.discard(n)
-        m.append((v,vn))
-    return m
+    
+def lcomp_simp_on_wire(g,level=1, matchf=None, quiet=False, stats=None):
+    if level==1:
+        return simp(g, 'lcomp_simp', match_lcomp_on_wire1, rules.lcomp, matchf=matchf, quiet=quiet, stats=stats)
+    if level==2:
+        return simp(g, 'lcomp_simp', match_lcomp_on_wire2, rules.lcomp, matchf=matchf, quiet=quiet, stats=stats)
+    
 
+
+def match_pivot_on_wire1(g, matchf=None, num=-1, check_edge_types=True):
+    return match_pivot_on_wire(g, level=1, matchf=matchf, num=num, check_edge_types=check_edge_types) 
+
+def match_pivot_on_wire2(g, matchf=None, num=-1, check_edge_types=True):
+    return match_pivot_on_wire(g, level=2, matchf=matchf, num=num, check_edge_types=check_edge_types)
+
+def match_pivot_on_wire3(g, matchf=None, num=-1, check_edge_types=True):
+    return match_pivot_on_wire(g, level=3, matchf=matchf, num=num, check_edge_types=check_edge_types)
+    
+def match_lcomp_on_wire1(g, level=1,vertexf=None, num=-1, check_edge_types=True):
+    return  match_lcomp_on_wire(g, level=1,vertexf=vertexf, num=num, check_edge_types=check_edge_types)
+
+def match_lcomp_on_wire2(g, level=1,vertexf=None, num=-1, check_edge_types=True):
+    return  match_lcomp_on_wire(g, level=2,vertexf=vertexf, num=num, check_edge_types=check_edge_types)
 
 
 def match_pivot_on_wire(g, level=1, matchf=None, num=-1, check_edge_types=True): 
@@ -175,7 +119,7 @@ def match_pivot_on_wire(g, level=1, matchf=None, num=-1, check_edge_types=True):
        consider all edges.
     :rtype: List of 4-tuples. See :func:`pivot` for the details.
     """
-    if matchf is not None: candidates = set([e for e in g.edges() if matchf(e)])
+    if matchf is not None: candidates = {e for e in g.edges() if matchf(e)}
     else: candidates = g.edge_set()
     types = g.types()
     phases = g.phases()
@@ -241,4 +185,51 @@ def match_pivot_on_wire(g, level=1, matchf=None, num=-1, check_edge_types=True):
         b0 = list(v0b)
         b1 = list(v1b)
         m.append((v0,v1,b0,b1))
+    return m
+
+
+def match_lcomp_on_wire(g, level=1,vertexf=None, num=-1, check_edge_types=True):
+    """Finds noninteracting matchings of the local complementation rule.
+    
+    :param g: An instance of a ZX-graph.
+    :param num: Maximal amount of matchings to find. If -1 (the default)
+       tries to find as many as possible.
+    :param check_edge_types: Whether the method has to check if all the edges involved
+       are of the correct type (Hadamard edges).
+    :param vertexf: An optional filtering function for candidate vertices, should
+       return True if a vertex should be considered as a match. Passing None will
+       consider all vertices.
+    :rtype: List of 2-tuples ``(vertex, neighbors)``.
+    """
+    if vertexf is not None: candidates = {v for v in g.vertices() if vertexf(v)}
+    else: candidates = g.vertex_set()
+    types = g.types()
+    phases = g.phases()
+    i = 0
+    m = []
+    while (num == -1 or i < num) and len(candidates) > 0:
+        v = candidates.pop()
+        
+        #### I added this line to only allow spiders with at most two neighbors
+        if level==1:
+            if len(g.neighbors(v))>2: continue
+        elif level==2:
+            pass
+        else:
+            raise ValueError('level must be either 1 or 2')
+        #####
+        
+        vt = types[v]
+        va = g.phase(v)
+        if vt != VertexType.Z: continue
+        if not (va == Fraction(1,2) or va == Fraction(3,2)): continue
+        if g.is_ground(v):
+            continue
+        if check_edge_types and not (
+            all(g.edge_type(e) == EdgeType.HADAMARD for e in g.incident_edges(v))
+            ): continue          
+        vn = list(g.neighbors(v))
+        if not all(types[n] == VertexType.Z for n in vn): continue
+        for n in vn: candidates.discard(n)
+        m.append((v,vn))
     return m

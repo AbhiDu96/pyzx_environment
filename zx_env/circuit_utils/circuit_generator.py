@@ -21,7 +21,7 @@ def random_circuit(n_qubit=5, num_gates=40, p_two_qubit=0.1, p_H=0.7, p_z=0.1, p
             target=np.random.choice(range(n_qubit))
             while True:
                 control=np.random.choice(range(n_qubit))
-                if not control==target:
+                if control != target:
                     break
             two_qubit_gate=np.random.choice(range(2))
             if two_qubit_gate==0 and add_cz:

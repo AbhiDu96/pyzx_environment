@@ -1,10 +1,12 @@
 import gymnasium as gym
+from collections.abc import Sequence
 import numpy as np
 import pyzx as zx
 import torch
 import re
 import torch_geometric.transforms as T
 import copy
+from dataclasses import dataclass
 from fractions import Fraction
 from zx_env.rules import custom_rules as rules
 from zx_env.circuit_utils.circuit_generator import random_circuit
@@ -50,6 +52,38 @@ RenderFrame = TypeVar("RenderFrame")
 REWARD_REWRITE_EXCEPTION = -10    # a rewrite raised an exception while being applied
 REWARD_ILLEGAL_ACTION = -199      # a masked-out (not applicable) action was selected
 REWARD_NOT_EQUIVALENT = -1000     # final graph is not equivalent to the original circuit
+REWARD_FN_MAP = {
+    "normalized_t_count_reward": rf.normalized_t_count_reward,
+    "absolute_t_count_reward": rf.absolute_t_count_reward,
+    "absolute_cnot_count_reward": rf.absolute_cnot_count_reward,
+    "normalized_cnot_count_reward": rf.normalized_cnot_count_reward,
+    "pyzx_normalized_t_count_reward": rf.pyzx_normalized_t_count_reward,
+    "pyzx_normalized_cnot_count_reward": rf.pyzx_normalized_cnot_count_reward,
+}
+
+
+@dataclass(frozen=True)
+class ZXEnvConfig:
+    n_qubits: Any = 5
+    depth: Any = 250
+    rules_list: list[str] | None = None
+    max_steps: int = 100
+    h_ratio: Any = 0.3
+    t_ratio: Any = 0.5
+    mq_ratio: Any = 0.1
+    graph_type: str = "homogeneous"
+    random_location: bool = True
+    add_no_action: bool = False
+    mutate_graph: bool = True
+    mutate_probability: float = 0.5
+    mutation_steps: int = 100
+    min_t_count_diff: float = 0.1
+    reward_fn: Any = "normalized_t_count_reward"
+    circuit_extraction_type: str = "custom"
+    negative_reward_mean: float = -0.1
+    negative_reward_std: float = 0.0
+    full_fuse_every_step: bool = False
+    reduce_at_reset: bool = False
 
 
 class ZXEnv(gym.Env):
@@ -61,66 +95,98 @@ class ZXEnv(gym.Env):
     to reduce the two-qubit (CNOT/CZ) and/or T gate count of the extracted circuit while
     keeping it equivalent to the original.
     """
+    _FEATURE_STAT_KEYS: tuple[str, ...] = (
+        "gates",
+        "tcount",
+        "clifford",
+        "twoqubit",
+        "had",
+        "depth",
+        "depth_cz",
+    )
+
     def __init__(self, n_qubits = 5, depth = 250, rules_list = None, max_steps=100, h_ratio = 0.3, t_ratio = 0.5, mq_ratio = 0.1,
         graph_type = "homogeneous", random_location=True, add_no_action=False,
         mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_t_count_diff=0.1,
         reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0, full_fuse_every_step=False,reduce_at_reset=False) -> None:
         super().__init__()
 
-        self.h_ratio = h_ratio
-        self.t_ratio = t_ratio
-        self.mq_ratio = mq_ratio
-        self.n_qubits = n_qubits
-        self.n_depth = depth
-        self.graph_type = graph_type
-        self.add_no_action = add_no_action
-        self.mutate_graph = mutate_graph
-        self.mutate_probability = mutate_probability
-        self.mutation_steps = mutation_steps
-        self.min_t_count_diff = min_t_count_diff
-        self.circuit_extraction_type = circuit_extraction_type
-        self.negative_reward_mean = negative_reward_mean
-        self.negative_reward_std = negative_reward_std
-        if reward_fn == "normalized_t_count_reward":
-            self.reward_fn = rf.normalized_t_count_reward
-        elif reward_fn == "absolute_t_count_reward":
-            self.reward_fn = rf.absolute_t_count_reward
-        elif reward_fn == "absolute_cnot_count_reward":
-            self.reward_fn = rf.absolute_cnot_count_reward
-        elif reward_fn == "normalized_cnot_count_reward":
-            self.reward_fn = rf.normalized_cnot_count_reward
-        elif reward_fn == "pyzx_normalized_t_count_reward":
-            self.reward_fn = rf.pyzx_normalized_t_count_reward
-        elif reward_fn == "pyzx_normalized_cnot_count_reward":
-            self.reward_fn = rf.pyzx_normalized_cnot_count_reward
-        else:
-            self.reward_fn = reward_fn
+        cfg = ZXEnvConfig(
+            n_qubits=n_qubits,
+            depth=depth,
+            rules_list=rules_list,
+            max_steps=max_steps,
+            h_ratio=h_ratio,
+            t_ratio=t_ratio,
+            mq_ratio=mq_ratio,
+            graph_type=graph_type,
+            random_location=random_location,
+            add_no_action=add_no_action,
+            mutate_graph=mutate_graph,
+            mutate_probability=mutate_probability,
+            mutation_steps=mutation_steps,
+            min_t_count_diff=min_t_count_diff,
+            reward_fn=reward_fn,
+            circuit_extraction_type=circuit_extraction_type,
+            negative_reward_mean=negative_reward_mean,
+            negative_reward_std=negative_reward_std,
+            full_fuse_every_step=full_fuse_every_step,
+            reduce_at_reset=reduce_at_reset,
+        )
 
+        self.h_ratio = cfg.h_ratio
+        self.t_ratio = cfg.t_ratio
+        self.mq_ratio = cfg.mq_ratio
+        self.n_qubits = cfg.n_qubits
+        self.n_depth = cfg.depth
+        self.graph_type = cfg.graph_type
+        self.add_no_action = cfg.add_no_action
+        self.mutate_graph = cfg.mutate_graph
+        self.mutate_probability = cfg.mutate_probability
+        self.mutation_steps = cfg.mutation_steps
+        self.min_t_count_diff = cfg.min_t_count_diff
+        self.circuit_extraction_type = cfg.circuit_extraction_type
+        self.negative_reward_mean = cfg.negative_reward_mean
+        self.negative_reward_std = cfg.negative_reward_std
+        self.reward_fn = self._resolve_reward_fn(cfg.reward_fn)
 
-        if graph_type == "homogeneous":
-            self.converter = pyzx_to_homogeneous_torchData
-        else:
-            self.converter = pyzx_to_heterogeneous_torchData
-        self.random_location=random_location
+        self.converter = self._resolve_converter(cfg.graph_type)
+        self.random_location = cfg.random_location
 
-        if rules_list is not None:
-            self.rules_list = ["match_"+r for r in rules_list]
-        else:
-            self.rule_func_list = dir(rules)
-            self.rules_list = [r for r in self.rule_func_list if "match_" in r]
-        logging.debug("rules: %s", self.rules_list)
+        self.rule_func_list, self.rules_list = self._resolve_rules_list(cfg.rules_list)
+        logging.debug("rules: %s", self.rules_list)  # noqa: LOG015
         self.state_zx_graph_initial = None
         self.state_zx_graph = None
         self.state = None
 
         self.action_space = gym.spaces.Discrete(len(self.rules_list))
-        self._max_episode_steps = max_steps
+        self._max_episode_steps = cfg.max_steps
         self.step_counter = 0
         # this is just a dummy to make gymnasium happy
         self.observation_space = gym.spaces.Discrete(5)
-        self.full_fuse_every_step=full_fuse_every_step
-        self.reduce_at_reset = reduce_at_reset
+        self.full_fuse_every_step = cfg.full_fuse_every_step
+        self.reduce_at_reset = cfg.reduce_at_reset
         self.bench_mark()
+
+    @classmethod
+    def _resolve_reward_fn(cls, reward_fn: Any) -> Any:
+        if isinstance(reward_fn, str):
+            return REWARD_FN_MAP.get(reward_fn, reward_fn)
+        return reward_fn
+
+    @staticmethod
+    def _resolve_converter(graph_type: str) -> Any:
+        if graph_type == "homogeneous":
+            return pyzx_to_homogeneous_torchData
+        return pyzx_to_heterogeneous_torchData
+
+    @staticmethod
+    def _resolve_rules_list(rules_list: Sequence[str] | None) -> tuple[list[str], list[str]]:
+        if rules_list is not None:
+            return [], ["match_" + r for r in rules_list]
+        rule_func_list = dir(rules)
+        resolved_rules = [r for r in rule_func_list if "match_" in r]
+        return rule_func_list, resolved_rules
 
 
     def sample_circuit(self):
@@ -146,20 +212,14 @@ class ZXEnv(gym.Env):
         stats = circ.stats_dict(depth=True)
         exp_qubits = self.n_qubits if isinstance(self.n_qubits, int) else np.mean(self.n_qubits)
         exp_gates = self.n_depth if isinstance(self.n_depth, int) else np.mean(self.n_depth)
-        expected_size = exp_gates*exp_qubits
-        gates = stats["gates"]/expected_size
-        tcount = stats["tcount"]/expected_size
-        clifford = stats["clifford"]/expected_size
-        twoqubit = stats["twoqubit"]/expected_size
-        had = stats["had"]/expected_size
-        depth = stats["depth"]/expected_size
-        depth_cz = stats["depth_cz"]/expected_size
-        edges = self.state_zx_graph.num_edges()/expected_size
-        feat = torch.tensor([gates,tcount,clifford,twoqubit,had,depth,depth_cz,edges]).float()
+        expected_size = exp_gates * exp_qubits
+        feat_values = [stats[k] / expected_size for k in self._FEATURE_STAT_KEYS]
+        feat_values.append(self.state_zx_graph.num_edges() / expected_size)
+        feat = torch.tensor(feat_values).float()
         return feat
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None, initial_circuit_graph = None,
-                simplify_initial_circuit = False) -> Tuple[ObsType, dict]:
+    def reset(self, *, seed: int | None = None, options: dict | None = None, initial_circuit_graph = None,
+                simplify_initial_circuit = False) -> tuple[ObsType, dict]:
 
         self.step_counter = 0
         circuit_generated = False
@@ -187,7 +247,7 @@ class ZXEnv(gym.Env):
                     if self.baseline_t_count >= 10:
                         circuit_generated = True
         else:
-            logging.debug("loading pre-done circuit")
+            logging.debug("loading pre-done circuit")  # noqa: LOG015
             if simplify_initial_circuit:
                 (initial_circuit, _) = extract_circuit(initial_circuit_graph)
                 initial_circuit_graph = initial_circuit.to_graph()
@@ -214,20 +274,20 @@ class ZXEnv(gym.Env):
                 rewrite = getattr(rules, match_name)
                 if len(match_tuples)>0:
                     if match_name == "unspider":
-                        neighbor=[list(self.state_zx_graph.neighbors(match_tuples[match_num]))[0]]
+                        neighbor=[next(iter(self.state_zx_graph.neighbors(match_tuples[match_num])))]
                         new_phase=Fraction(1,1)
                         rules.unspider(self.state_zx_graph, [match_tuples[match_num],neighbor, new_phase])
                     else:
                         rules.apply_rule(g=self.state_zx_graph, rewrite=rewrite, m=match_tuples[match_num])
         if self.reduce_at_reset:
-            logging.debug("reform")
+            logging.debug("reform")  # noqa: LOG015
             rules.full_fuse(self.state_zx_graph)
 
         self.state = self.converter(self.state_zx_graph)
         self.node_index_mapping = np.array(list(self.state_zx_graph.ty.keys()))
         self.state = T.ToUndirected()(self.state)
         self.compute_action_masks()
-        info = dict()
+        info = {}
         reward, info["level"] = self.reward_fn(zx_graph=self.state_zx_graph.clone(), baseline_t_count=self.baseline_t_count, baseline_cnot_count=self.baseline_cnot_count,
                                 pyzx_t_count=self.pyzx_t_count, pyzx_cnot_count=self.pyzx_cnot_count, circuit_extract_method=self.circuit_extraction_type)
         info["reward"]=reward
@@ -297,7 +357,7 @@ class ZXEnv(gym.Env):
         return match_name, match_tuples, match_num
 
 
-    def step(self, action: ActType, position: int | None = None, location: int | None = None,pyzx_state : Any | None = None) -> Tuple[ObsType, float, bool, bool, dict]:
+    def step(self, action: ActType, position: int | None = None, location: int | None = None, pyzx_state : Any | None = None) -> tuple[ObsType, float, bool, bool, dict]:
         assert self.state is not None, "Call reset before using step method."
 
         if pyzx_state is not None:
@@ -325,7 +385,7 @@ class ZXEnv(gym.Env):
             if self.action_masks[action][0] != 1:
 
                 if not terminated :
-                    match_name, match_tuples, match_num = self.select_match_tuples(action)
+                    match_name, match_tuples, _match_num = self.select_match_tuples(action)
 
                     rewrite = getattr(rules, match_name)
                     info["applied_rule"] = match_name
@@ -347,7 +407,7 @@ class ZXEnv(gym.Env):
                         try:
                             if match_name == "unspider":
                                 info["match_num"] = position
-                                neighbor=[list(self.state_zx_graph.neighbors(location))[0]]
+                                neighbor=[next(iter(self.state_zx_graph.neighbors(location)))]
                                 new_phase=Fraction(1,1)
                                 rules.unspider(self.state_zx_graph, [location,neighbor, new_phase])
                             else:
@@ -401,7 +461,8 @@ class ZXEnv(gym.Env):
                     circuit = zx.extract_circuit(self.state_zx_graph.clone())
 
                 current_cnot_count = circuit.stats_dict()['twoqubit']
-
+                
+                # store the initial and final circuit information in the info dictionary
                 info["init_circuit"] = self.state_circuit_initial
                 info["init_circuit_cnot_count"] = self.baseline_cnot_count
                 info["init_circuit_t_count"] = self.baseline_t_count
