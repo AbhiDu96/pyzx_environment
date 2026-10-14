@@ -5,7 +5,6 @@ from pyzx.graph.base import BaseGraph, VT, ET
 from typing import Callable, Optional, List, Tuple,Dict,TypeVar
 from pyzx import rules
 from fractions import Fraction
-import random
 RewriteOutputType = Tuple[Dict[ET,List[int]], List[VT], List[ET], bool]
 MatchObject = TypeVar('MatchObject')
 
@@ -28,33 +27,41 @@ def apply_rule(
 
 ### Soft rules ########################
 
+def _filtered(universe, pred: Optional[Callable] = None) -> set:
+    """Materialize an iterable of candidates as a set, optionally filtered by pred."""
+    if pred is not None:
+        return {x for x in universe if pred(x)}
+    return set(universe)
+
+
+def _match_spiders_of_type(
+        g: BaseGraph[VT, ET],
+        vtype,
+        vertexf: Optional[Callable[[VT], bool]] = None
+        ) -> List[VT]:
+    candidates = _filtered(g.vertices(), vertexf)
+    types = g.types()
+    return [v for v in candidates if types[v] == vtype]
+
+
 def matchU_X_spiders(
         g: BaseGraph[VT, ET],
         vertexf: Optional[Callable[[VT], bool]] = None
         ) -> List[VT]:
-    if vertexf is not None: candidates = set([v for v in g.vertices() if vertexf(v)])
-    else: candidates = g.vertex_set()
-    types = g.types()
-
-    return [v for v in candidates if types[v] == VertexType.X]
+    return _match_spiders_of_type(g, VertexType.X, vertexf)
 
 
 def matchU_Z_spiders(
         g: BaseGraph[VT, ET],
         vertexf: Optional[Callable[[VT], bool]] = None
         ) -> List[VT]:
-    if vertexf is not None: candidates = set([v for v in g.vertices() if vertexf(v)])
-    else: candidates = g.vertex_set()
-    types = g.types()
-
-    return [v for v in candidates if types[v] == VertexType.Z]
+    return _match_spiders_of_type(g, VertexType.Z, vertexf)
 
 
 def match_bialgebra(g: BaseGraph[VT,ET], 
         edgef: Optional[Callable[[ET],bool]] = None
         ) -> List[Tuple[VT,VT]]:
-    if edgef is not None: candidates = set([e for e in g.edges() if edgef(e)])
-    else: candidates = g.edge_set()
+    candidates = _filtered(g.edges(), edgef)
     m = []
     types = g.types()
     while len(candidates) > 0:
@@ -128,8 +135,7 @@ def match_euler(
         g: BaseGraph[VT,ET], 
         edgef: Optional[Callable[[ET],bool]] = None
         ) -> List[ET]:
-    if edgef is not None: candidates = set([e for e in g.edges() if edgef(e)])
-    else: candidates = g.edge_set()
+    candidates = _filtered(g.edges(), edgef)
     return [e for e in candidates if g.edge_type(e)==EdgeType.HADAMARD]
 
 
@@ -204,31 +210,29 @@ def match_pi_copy(
         g: BaseGraph[VT,ET], 
         vertexf: Optional[Callable[[VT],bool]] = None
         ) -> List[Tuple[VT,VT]]:
-    if vertexf is not None: candidates = set([v for v in g.vertices() if vertexf(v)])
-    else: candidates = g.vertex_set()
+    candidates = _filtered(g.vertices(), vertexf)
     phases = g.phases()
     types = g.types()
     m: List[Tuple[VT,VT]] = []
     paulis = {v for v in candidates
                 if phases[v] == 1 and vertex_is_zx(types[v])}
     if not paulis: return m
-    
+
     # attention! The elements in m (w,v) are not general edges but ordered, that is,
     # w is the Pauli and v the vertex we push it through
-    while len(candidates) > 0:
-        v = candidates.pop()
+    for v in candidates:
+        # check every Pauli neighbor, not just the first found: v may have several,
+        # and only some of them may satisfy the match condition below.
         for w in g.neighbors(v):
-            if w in paulis: break
-        else:
-            continue
-        et = g.edge_type(g.edge(v,w))
-        if ((types[v] == types[w] and et == EdgeType.HADAMARD) or
-            (vertex_is_zx(types[v]) and types[v] != types[w] and et == EdgeType.SIMPLE) or
-            (types[v] == VertexType.H_BOX and phases[v] == 1 and (
-                (et == EdgeType.SIMPLE and types[w] == VertexType.X) or
-                (et == EdgeType.HADAMARD and types[w] == VertexType.Z)))
-            ):
-            m.append((w,v))
+            if w not in paulis: continue
+            et = g.edge_type(g.edge(v,w))
+            if ((types[v] == types[w] and et == EdgeType.HADAMARD) or
+                (vertex_is_zx(types[v]) and types[v] != types[w] and et == EdgeType.SIMPLE) or
+                (types[v] == VertexType.H_BOX and phases[v] == 1 and (
+                    (et == EdgeType.SIMPLE and types[w] == VertexType.X) or
+                    (et == EdgeType.HADAMARD and types[w] == VertexType.Z)))
+                ):
+                m.append((w,v))
     return m
 
 
@@ -284,8 +288,7 @@ def match_add_identity(
         g: BaseGraph[VT,ET], 
         edgef: Optional[Callable[[ET],bool]] = None
         ) -> List[ET]:
-    if edgef is not None: candidates = set([e for e in g.edges() if edgef(e)])
-    else: candidates = g.edge_set()
+    candidates = _filtered(g.edges(), edgef)
     return list(candidates)
 
 
@@ -311,8 +314,7 @@ def add_identity(g: BaseGraph[VT,ET],
 def match_add_hadamard_identity(g, edgef=None):
     # only simple edges (no Hadamard edges are allowed)
     allowed_edges=[e for e in g.edges() if g.edge_type(e)==EdgeType.SIMPLE ]
-    if edgef is not None: candidates = set([e for e in allowed_edges if edgef(e)])
-    else: candidates = allowed_edges
+    candidates = _filtered(allowed_edges, edgef)
     return list(candidates)
 
 
@@ -336,9 +338,8 @@ def add_hadamard_identity(g,match):
 def match_spider_fusion(
         g: BaseGraph[VT,ET], 
         matchf:Optional[Callable[[ET],bool]]=None
-        ): 
-    if matchf is not None: candidates = set([e for e in g.edges() if matchf(e)])
-    else: candidates = g.edge_set()
+        ):
+    candidates = _filtered(g.edges(), matchf)
     types = g.types()
 
     m = []
@@ -357,7 +358,6 @@ def spider_fusion(g: BaseGraph[VT,ET], match) -> RewriteOutputType[ET,VT]:
     matches=[match]
     rem_verts = []
     etab: Dict[ET,List[int]] = dict()
-    types = g.types()
 
     for m in matches:
         if g.row(m[0]) == 0:
@@ -448,8 +448,7 @@ def match_complete_unfuse(
         g: BaseGraph[VT, ET],
         vertexf: Optional[Callable[[VT], bool]] = None
         ) -> List[VT]:
-    if vertexf is not None: candidates = set([v for v in g.vertices() if vertexf(v)])
-    else: candidates = g.vertex_set()
+    candidates = _filtered(g.vertices(), vertexf)
     types = g.types()
 
     return [v for v in candidates if ((types[v] == VertexType.Z) or (types[v] == VertexType.X)) and len(g.neighbors(v))>3]
@@ -461,7 +460,6 @@ def complete_unfuse(g, match):
     rem_edges = []
     
     neighbors=g.neighbors(match)
-    n_neighbors=len(neighbors)
 
     v_type=g.type(match)
     phase=g.phase(match)
