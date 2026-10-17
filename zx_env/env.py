@@ -84,6 +84,9 @@ class ZXEnvConfig:
     negative_reward_std: float = 0.0
     full_fuse_every_step: bool = False
     reduce_at_reset: bool = False
+    circuit_source: str = "random"  # "random" | "mqtbench"
+    mqtbench_cache_dir: str | None = None
+    mqtbench_qubit_target: int | None = None  # None = sample whole MQTBench pool
 
 
 class ZXEnv(gym.Env):
@@ -108,7 +111,8 @@ class ZXEnv(gym.Env):
     def __init__(self, n_qubits = 5, depth = 250, rules_list = None, max_steps=100, h_ratio = 0.3, t_ratio = 0.5, mq_ratio = 0.1,
         graph_type = "homogeneous", random_location=True, add_no_action=False,
         mutate_graph=True, mutate_probability = 0.5, mutation_steps=100, min_t_count_diff=0.1,
-        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0, full_fuse_every_step=False,reduce_at_reset=False) -> None:
+        reward_fn="normalized_t_count_reward", circuit_extraction_type="custom", negative_reward_mean=-0.1, negative_reward_std=0.0, full_fuse_every_step=False,reduce_at_reset=False,
+        circuit_source="random", mqtbench_cache_dir=None, mqtbench_qubit_target=None) -> None:
         super().__init__()
 
         cfg = ZXEnvConfig(
@@ -132,7 +136,16 @@ class ZXEnv(gym.Env):
             negative_reward_std=negative_reward_std,
             full_fuse_every_step=full_fuse_every_step,
             reduce_at_reset=reduce_at_reset,
+            circuit_source=circuit_source,
+            mqtbench_cache_dir=mqtbench_cache_dir,
+            mqtbench_qubit_target=mqtbench_qubit_target,
         )
+        if cfg.circuit_source not in ("random", "mqtbench"):
+            raise ValueError(f"circuit_source must be 'random' or 'mqtbench', got {cfg.circuit_source!r}")
+        self.circuit_source = cfg.circuit_source
+        self.mqtbench_cache_dir = cfg.mqtbench_cache_dir
+        self.mqtbench_qubit_target = cfg.mqtbench_qubit_target
+        self._mqtbench_pool = None
 
         self.h_ratio = cfg.h_ratio
         self.t_ratio = cfg.t_ratio
@@ -185,11 +198,16 @@ class ZXEnv(gym.Env):
         if rules_list is not None:
             return [], ["match_" + r for r in rules_list]
         rule_func_list = dir(rules)
-        resolved_rules = [r for r in rule_func_list if "match_" in r]
+        resolved_rules = [r for r in rule_func_list if "match_" in r and not r.startswith("_")]
         return rule_func_list, resolved_rules
 
 
     def sample_circuit(self):
+        if self.circuit_source == "mqtbench":
+            if self._mqtbench_pool is None:
+                from zx_env.circuit_utils.mqt_bench_loader import build_pool
+                self._mqtbench_pool = build_pool(cache_dir=self.mqtbench_cache_dir)
+            return self._mqtbench_pool.sample_circuit(n_qubits=self.mqtbench_qubit_target)
         n_qubits = self.n_qubits if isinstance(self.n_qubits, int) else np.random.randint(*self.n_qubits)
         n_depth = self.n_depth if isinstance(self.n_depth, int) else np.random.randint(*self.n_depth)
         mq_ratio= self.mq_ratio if isinstance(self.mq_ratio, float) else np.random.uniform(*self.mq_ratio)
@@ -240,7 +258,10 @@ class ZXEnv(gym.Env):
                 zx.full_reduce(self.reduced_zx_graph)
 
                 self.pyzx_t_count = tcount_from_graph(self.reduced_zx_graph)
-                if np.random.random() < 0.5:
+                if self.circuit_source == "mqtbench":
+                    # structured circuits are accepted as-is (no T-count rejection sampling)
+                    circuit_generated = True
+                elif np.random.random() < 0.5:
                     if (self.baseline_t_count-self.pyzx_t_count)/(self.baseline_t_count+1e-5) >= self.min_t_count_diff:
                         circuit_generated = True
                 else:
