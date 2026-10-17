@@ -19,27 +19,38 @@ it semantically equivalent to the original.
 
 ## Installation
 
-Requires Python ≥ 3.8. Install the package (editable) from this directory:
+Requires **Python 3.11** (pinned by `.python-version`; `pyproject.toml` requires ≥3.10, but
+the stack's `numpy<2` / PyZX 0.8.0 pins mean 3.11/3.12 in practice). Dependencies
+(`pyzx==0.8.0`, `gymnasium`, `numpy<2`, `torch`, `torch-geometric`) are declared in
+`pyproject.toml`.
+
+**Normally you do not install this package directly.** The training project
+[`ZXDiagramSimplification`](https://github.com/AbhiDu96/ZXDiagramSimplification) installs it
+automatically as an editable dependency when you run `uv sync` there — provided the two
+repositories are cloned as **siblings** (`../pyzx_environment` relative to the training repo).
+See that repo's README §2 for the one-step setup.
+
+To work on the environment **standalone**, use [`uv`](https://docs.astral.sh/uv/) from this
+directory:
 
 ```bash
-pip install -e .
+uv sync                       # create .venv and install zx_env + deps (editable)
+uv run python test.py         # minimal end-to-end smoke test
 ```
 
-Core runtime dependencies (installed separately, see the parent project for pinned
-versions):
-
-```bash
-pip install pyzx gymnasium numpy torch torch-geometric matplotlib
-```
+> **Structured (MQTBench) circuits.** `circuit_source="mqtbench"` additionally needs the
+> `mqt-bench` package (`uv run --with 'mqt-bench>=2.3,<3' ...`, or `uv pip install
+> 'mqt-bench>=2.3,<3'`). It is an optional runtime extra, not a core dependency; the default
+> `circuit_source="random"` needs nothing extra.
 
 ## Quick start
 
 ```python
 import numpy as np
-from zx_env import zx_env   # class is re-exported from zx_env.env
+from zx_env import ZXEnv   # class is re-exported from zx_env.env
 
 # Create an environment that samples random 5-qubit, depth-250 Clifford+T circuits
-env = zx_env(n_qubits=5, depth=250, max_steps=100)
+env = ZXEnv(n_qubits=5, depth=250, max_steps=100)
 
 obs, info = env.reset()
 state, action_masks, zx_graph, node_masks, edge_masks, rule_mask = obs
@@ -57,7 +68,7 @@ See [`test.py`](test.py) for a minimal end-to-end smoke test.
 
 ```
 pyzx_environment/
-├── setup.py                              # installs the `zx_env` package
+├── pyproject.toml                        # package metadata + deps (hatchling build)
 ├── test.py                               # minimal usage / smoke test
 └── zx_env/
     ├── env.py                            # zx_env: the Gymnasium environment (main entry point)
