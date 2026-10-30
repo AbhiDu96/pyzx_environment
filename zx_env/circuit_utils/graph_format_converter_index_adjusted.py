@@ -104,8 +104,8 @@ def calculate_edge_COO_undirected(pyzx_graph):
     rows, cols, edge_features = [], [], []
     for k, values in graph_dict.items():
         for i, edge_type in values.items():
-            k_loc = int(np.where(node_keys == k)[0])
-            i_loc = int(np.where(node_keys == i)[0])
+            k_loc = int(np.where(node_keys == k)[0][0])
+            i_loc = int(np.where(node_keys == i)[0][0])
             rows.append(k_loc)
             cols.append(i_loc)
             edge_features.append(edge_type)
@@ -136,8 +136,8 @@ def calculate_heterogeneous_edge_COO_directed(pyzx_graph, node_list1, node_list2
         for node_2 in list(connected_nodes.keys()):
             if node_2 in node_list2 and {node_1, node_2} not in set_list:
     
-                rows.append(int(np.where(node_list1 == node_1)[0]))
-                cols.append(int(np.where(node_list2 == node_2)[0]))
+                rows.append(int(np.where(node_list1 == node_1)[0][0]))
+                cols.append(int(np.where(node_list2 == node_2)[0][0]))
                 edge_features.append(connected_nodes[node_2])
                 set_list.append({node_1, node_2})
     

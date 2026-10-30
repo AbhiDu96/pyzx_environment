@@ -37,8 +37,8 @@ def tcount_from_graph(g):
     g_copy=copy.deepcopy(g)
     # first fuse all possible spiders and remove all identities
     while True:
-        r1=zx.id_simp(g_copy, quiet=True) 
-        r2=zx.spider_simp(g_copy, quiet=True)
+        r1=zx.id_simp(g_copy) 
+        r2=zx.spider_simp(g_copy)
         if r1==0 and r2==0:
             break
     # go through all phases. They must be integer multiples of pi/4
@@ -60,4 +60,3 @@ def tcount_from_graph(g):
             import logging; logging.warning("unexpected phase type: %s", type(phase))  # noqa: I001, LOG015
             assert 0, 'phases must be fractions or integers'
     return tcount
-

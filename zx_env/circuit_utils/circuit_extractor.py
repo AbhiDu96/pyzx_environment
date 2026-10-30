@@ -1,6 +1,5 @@
 import pyzx as zx
-from pyzx import rules
-from pyzx.simplify import id_simp, spider_simp, to_graph_like, to_gh, lcomp_simp, simp
+from pyzx.simplify import id_simp, spider_simp, to_graph_like, to_gh, lcomp_simp, pivot as zx_pivot, lcomp as zx_lcomp
 import copy
 from pyzx.utils import VertexType, EdgeType, toggle_edge, vertex_is_zx, FloatInt, FractionLike
 from fractions import Fraction
@@ -44,7 +43,7 @@ def extract_circuit(graph, quiet=True, up_to_perm=False):
 def interior_clifford_simp_on_wire(g, relax_level=1, quiet=False, stats=None):
     """Keeps doing the simplifications ``id_simp``, ``spider_simp``,
     ``pivot_simp`` and ``lcomp_simp`` until none of them can be applied anymore."""
-    spider_simp(g, quiet=quiet, stats=stats)
+    spider_simp(g)
     to_gh(g)
     i = 0
     if relax_level==1:
@@ -64,8 +63,8 @@ def interior_clifford_simp_on_wire(g, relax_level=1, quiet=False, stats=None):
         level_lcomp=2
         
     while True:
-        i1 = id_simp(g, quiet=quiet, stats=stats)
-        i2 = spider_simp(g, quiet=quiet, stats=stats)
+        i1 = id_simp(g)
+        i2 = spider_simp(g)
         i3 = pivot_simp_on_wire(g, level_pivot, quiet=quiet, stats=stats)
         i4 = lcomp_simp_on_wire(g, level_lcomp, quiet=quiet, stats=stats)
         if i1+i2+i3+i4==0: break
@@ -74,19 +73,39 @@ def interior_clifford_simp_on_wire(g, relax_level=1, quiet=False, stats=None):
 
 
 def pivot_simp_on_wire(g, level=1, matchf=None, quiet=False, stats=None):
+    matcher = None
     if level==1:
-        return simp(g, 'pivot_simp', match_pivot_on_wire1, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
-    if level==2:
-        return simp(g, 'pivot_simp', match_pivot_on_wire2, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
-    if level==3:
-        return simp(g, 'pivot_simp', match_pivot_on_wire3, rules.pivot, matchf=matchf, quiet=quiet, stats=stats)
+        matcher = match_pivot_on_wire1
+    elif level==2:
+        matcher = match_pivot_on_wire2
+    elif level==3:
+        matcher = match_pivot_on_wire3
+    else:
+        raise ValueError('level must be between 1 and 3')
+
+    matches = matcher(g, matchf=matchf)
+    i = 0
+    for v0, v1, _, _ in matches:
+        if zx_pivot(g, v0, v1):
+            i += 1
+    return i
     
     
 def lcomp_simp_on_wire(g,level=1, matchf=None, quiet=False, stats=None):
+    matcher = None
     if level==1:
-        return simp(g, 'lcomp_simp', match_lcomp_on_wire1, rules.lcomp, matchf=matchf, quiet=quiet, stats=stats)
-    if level==2:
-        return simp(g, 'lcomp_simp', match_lcomp_on_wire2, rules.lcomp, matchf=matchf, quiet=quiet, stats=stats)
+        matcher = match_lcomp_on_wire1
+    elif level==2:
+        matcher = match_lcomp_on_wire2
+    else:
+        raise ValueError('level must be either 1 or 2')
+
+    matches = matcher(g)
+    i = 0
+    for v, _ in matches:
+        if zx_lcomp(g, v):
+            i += 1
+    return i
     
 
 

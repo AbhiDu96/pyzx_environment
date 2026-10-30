@@ -11,12 +11,11 @@ authors = [
     { name = "Christian Ufrecht" },
     { name = "Abhishek Y. Dubey" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "gymnasium",
-    "numpy<2",  # code relies on numpy 1.x scalar-conversion semantics (int(np.where(...)[0]))
-    "pyzx==0.8.0",  # newest version compatible with the custom rewrite/extraction code;
-                    # 0.9+ removed the old `rules.pivot` 4-tuple match format, 0.10+ removed `pyzx.rules`
+    "numpy==2.4.6",
+    "pyzx==0.10.3",
     "torch",
     "torch-geometric",
 ]

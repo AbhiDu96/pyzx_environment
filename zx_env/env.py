@@ -333,7 +333,7 @@ class ZXEnv(gym.Env):
                 if type(match_tuples[0]) == tuple:
                     match_tuples_list = []
                     for element in match_tuples:
-                        match_tuples_list.append((int(np.where(self.node_index_mapping == element[0])[0]), int(np.where(self.node_index_mapping == element[1])[0])))
+                        match_tuples_list.append((int(np.where(self.node_index_mapping == element[0])[0][0]), int(np.where(self.node_index_mapping == element[1])[0][0])))
                     values, indices = torch.topk(((self.state.edge_index == torch.Tensor(match_tuples_list).unsqueeze(-1)).all(dim=1)).int(), 1, 1)
                     indices = indices[values!=0]
                     edge_mask[indices.numpy()] = 1

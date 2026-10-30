@@ -19,9 +19,8 @@ it semantically equivalent to the original.
 
 ## Installation
 
-Requires **Python 3.11** (pinned by `.python-version`; `pyproject.toml` requires ≥3.10, but
-the stack's `numpy<2` / PyZX 0.8.0 pins mean 3.11/3.12 in practice). Dependencies
-(`pyzx==0.8.0`, `gymnasium`, `numpy<2`, `torch`, `torch-geometric`) are declared in
+Requires **Python 3.11+** (pinned by `.python-version`; `pyproject.toml` requires ≥3.11).
+Dependencies (`pyzx==0.10.3`, `gymnasium`, `numpy==2.4.6`, `torch`, `torch-geometric`) are declared in
 `pyproject.toml`.
 
 **Normally you do not install this package directly.** The training project

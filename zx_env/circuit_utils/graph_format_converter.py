@@ -61,8 +61,8 @@ def calculate_heterogeneous_edge_COO_directed(pyzx_graph, node_list1, node_list2
         for node_2 in list(connected_nodes.keys()):
             if node_2 in node_list2 and set([node_1, node_2]) not in set_list:
     
-                rows.append(int(np.where(node_list1 == node_1)[0]))
-                cols.append(int(np.where(node_list2 == node_2)[0]))
+                rows.append(int(np.where(node_list1 == node_1)[0][0]))
+                cols.append(int(np.where(node_list2 == node_2)[0][0]))
                 edge_features.append(connected_nodes[node_2])
                 set_list.append(set([node_1, node_2]))
     

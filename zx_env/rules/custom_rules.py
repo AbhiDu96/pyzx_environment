@@ -3,7 +3,6 @@ from pyzx.utils import EdgeType, VertexType, FractionLike
 from pyzx.utils import toggle_edge, vertex_is_zx, toggle_vertex
 from pyzx.graph.base import BaseGraph, VT, ET
 from typing import Callable, Optional, List, Tuple,Dict,TypeVar
-from pyzx import rules
 from fractions import Fraction
 RewriteOutputType = Tuple[Dict[ET,List[int]], List[VT], List[ET], bool]
 MatchObject = TypeVar('MatchObject')
@@ -195,7 +194,7 @@ def match_color_change(
     return mx+mz
 
 
-def color_change(g: BaseGraph[VT,ET], match) -> rules.RewriteOutputType[ET,VT]:
+def color_change(g: BaseGraph[VT,ET], match) -> RewriteOutputType:
     assert isinstance(match, int), 'wrong input format color change'
     matches=[match]
     for v in matches:
@@ -294,7 +293,7 @@ def match_add_identity(
 
 def add_identity(g: BaseGraph[VT,ET], 
         match
-        ) -> rules.RewriteOutputType[ET,VT]:
+        ) -> RewriteOutputType:
     assert isinstance(match, tuple) and len(match) == 2, 'wrong input format add_identity'
     rem_edges = []
     etab = {}
@@ -498,7 +497,7 @@ def complete_unfuse(g, match):
 ### Hard rules ########################
 
 def full_fuse(g):
-    zx.spider_simp(g, quiet=True)
+    zx.spider_simp(g)
     
 def full_id_remove(g):
-    zx.id_simp(g, quiet=True) 
+    zx.id_simp(g) 
